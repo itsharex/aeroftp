@@ -1,4 +1,4 @@
-### Piano di Sviluppo per FTP_CLIENT_GUI (AeroFTP)
+### Piano di Sviluppo per PhantomFTP-GUI (AeroFTP)
 
 #### Fase 1: Funzionalità Core (Priorità Alta)
 - **Download/Upload file con progress bar**: Implementare trasferimenti reali con progress bar collegata al backend, non simulata. Aggiungere cancellazione trasferimenti e retry automatico su errori.

@@ -875,7 +875,7 @@ const App: React.FC = () => {
                   </button>
                 )}
                 {isConnected && (
-                  <button onClick={uploadMultipleFiles} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm flex items-center gap-1.5" title="Upload multiple files">
+                  <button onClick={() => uploadMultipleFiles()} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm flex items-center gap-1.5" title="Upload multiple files">
                     <Upload size={16} /> Upload Files
                   </button>
                 )}
@@ -1055,7 +1055,7 @@ const App: React.FC = () => {
                         {/* Metadata */}
                         <div className="space-y-1 text-xs">
                           <p className="font-medium truncate" title={previewFile.name}>{previewFile.name}</p>
-                          <p className="text-gray-500">Size: {formatBytes(previewFile.size)}</p>
+                          <p className="text-gray-500">Size: {formatBytes(previewFile.size || 0)}</p>
                           <p className="text-gray-500">Type: {previewFile.is_dir ? 'Directory' : previewFile.name.split('.').pop()?.toUpperCase() || 'File'}</p>
                           <p className="text-gray-500">Modified: {previewFile.modified || 'Unknown'}</p>
                         </div>
