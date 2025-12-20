@@ -148,6 +148,10 @@ impl FtpManager {
         
         for file_str in files {
             if let Ok(file) = self.parse_ftp_listing(&file_str) {
+                // Skip . and .. for cleaner UX - use "Up" button for navigation
+                if file.name == "." || file.name == ".." {
+                    continue;
+                }
                 remote_files.push(file);
             }
         }

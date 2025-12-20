@@ -384,16 +384,7 @@ async fn get_local_files(path: String) -> Result<Vec<LocalFileInfo>, String> {
 
     let mut files = Vec::new();
     
-    // Add parent directory if not root
-    if let Some(parent) = path.parent() {
-        files.push(LocalFileInfo {
-            name: "..".to_string(),
-            path: parent.to_string_lossy().to_string(),
-            size: None,
-            is_dir: true,
-            modified: None,
-        });
-    }
+    // Parent directory (..) removed - use "Up" button in toolbar for navigation
 
     let mut entries = tokio::fs::read_dir(&path)
         .await
@@ -433,8 +424,6 @@ async fn get_local_files(path: String) -> Result<Vec<LocalFileInfo>, String> {
 
     // Sort: directories first, then alphabetically
     files.sort_by(|a, b| {
-        if a.name == ".." { return std::cmp::Ordering::Less; }
-        if b.name == ".." { return std::cmp::Ordering::Greater; }
         match (a.is_dir, b.is_dir) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,

@@ -906,6 +906,7 @@ const App: React.FC = () => {
 
     const items: ContextMenuItem[] = [
       { label: downloadLabel, icon: '⬇️', action: () => downloadMultipleFiles(filesToUse) },
+      { label: 'Preview', icon: '👁️', action: () => openDevToolsPreview(file, true), disabled: count > 1 || file.is_dir || !isPreviewable(file.name) },
       { label: 'Rename', icon: '✏️', action: () => renameFile(file.path, file.name, true), disabled: count > 1 },
       { label: 'Permissions', icon: '🛡️', action: () => setPermissionsDialog({ file, visible: true }), disabled: count > 1 },
       { label: 'Delete', icon: '🗑️', action: () => deleteMultipleRemoteFiles(filesToUse), danger: true, divider: true },
@@ -935,6 +936,7 @@ const App: React.FC = () => {
         action: () => uploadMultipleFiles(filesToUpload),
         disabled: !isConnected
       },
+      { label: 'Preview', icon: '👁️', action: () => openDevToolsPreview(file, false), disabled: count > 1 || file.is_dir || !isPreviewable(file.name) },
       { label: 'Rename', icon: '✏️', action: () => renameFile(file.path, file.name, false), disabled: count > 1 },
       { label: 'Delete', icon: '🗑️', action: () => deleteMultipleLocalFiles(filesToUpload), danger: true, divider: true },
     ];
