@@ -834,18 +834,22 @@ const App: React.FC = () => {
             </div>
             {/* Saved Servers */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
-              <SavedServers onConnect={async (params, initialPath) => {
+              <SavedServers onConnect={async (params, initialPath, localInitialPath) => {
                 setConnectionParams(params);
                 setLoading(true);
                 try {
                   await invoke('connect_ftp', { params });
                   setIsConnected(true);
                   toast.success('Connected', `Connected to ${params.server}`);
-                  // Navigate to initial path if specified
+                  // Navigate to initial remote path if specified
                   if (initialPath) {
                     await changeRemoteDirectory(initialPath);
                   } else {
                     await loadRemoteFiles();
+                  }
+                  // Navigate to local initial path if specified (per-project folder)
+                  if (localInitialPath) {
+                    await changeLocalDirectory(localInitialPath);
                   }
                 } catch (error) {
                   toast.error('Connection Failed', String(error));

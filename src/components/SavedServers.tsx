@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Server, Plus, Trash2, Star, Edit2, X, Check } from 'lucide-react';
+import { Server, Plus, Trash2, Star, Edit2, X, Check, FolderOpen } from 'lucide-react';
 import { ServerProfile, ConnectionParams } from '../types';
 
 interface SavedServersProps {
-    onConnect: (params: ConnectionParams, initialPath?: string) => void;
+    onConnect: (params: ConnectionParams, initialPath?: string, localInitialPath?: string) => void;
     className?: string;
 }
 
@@ -39,6 +39,7 @@ export const SavedServers: React.FC<SavedServersProps> = ({ onConnect, className
         username: '',
         password: '',
         initialPath: '',
+        localInitialPath: '',
     });
 
     useEffect(() => {
@@ -56,6 +57,7 @@ export const SavedServers: React.FC<SavedServersProps> = ({ onConnect, className
             username: formData.username || '',
             password: formData.password,
             initialPath: formData.initialPath,
+            localInitialPath: formData.localInitialPath,
             lastConnected: editingId ? servers.find(s => s.id === editingId)?.lastConnected : undefined,
         };
 
@@ -97,11 +99,11 @@ export const SavedServers: React.FC<SavedServersProps> = ({ onConnect, className
             server: serverString,
             username: server.username,
             password: server.password || '',
-        }, server.initialPath);
+        }, server.initialPath, server.localInitialPath);
     };
 
     const resetForm = () => {
-        setFormData({ name: '', host: '', port: 21, username: '', password: '', initialPath: '' });
+        setFormData({ name: '', host: '', port: 21, username: '', password: '', initialPath: '', localInitialPath: '' });
         setEditingId(null);
         setShowAddForm(false);
     };
@@ -215,11 +217,21 @@ export const SavedServers: React.FC<SavedServersProps> = ({ onConnect, className
                     />
                     <input
                         type="text"
-                        placeholder="Initial Path (e.g. /www.axpdev.it)"
+                        placeholder="Remote Path (e.g. /www.axpdev.it)"
                         value={formData.initialPath || ''}
                         onChange={e => setFormData({ ...formData, initialPath: e.target.value })}
                         className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
                     />
+                    <div className="flex items-center gap-2">
+                        <FolderOpen size={16} className="text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Local Path (e.g. /home/user/projects/mysite)"
+                            value={formData.localInitialPath || ''}
+                            onChange={e => setFormData({ ...formData, localInitialPath: e.target.value })}
+                            className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                        />
+                    </div>
                     <button
                         onClick={handleSave}
                         disabled={!formData.host || !formData.username}

@@ -68,7 +68,8 @@ export interface ServerProfile {
   port: number;
   username: string;
   password?: string;
-  initialPath?: string;  // Initial directory to navigate after connection
+  initialPath?: string;       // Initial remote directory to navigate after connection
+  localInitialPath?: string;  // Initial local directory for this project/server
   color?: string;
   lastConnected?: string;
 }
