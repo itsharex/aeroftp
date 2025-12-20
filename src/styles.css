@@ -102,10 +102,10 @@ body {
   /* Tighter tracking */
 }
 
-/* Scrollbar Styling */
+/* Scrollbar Styling - Main window nearly invisible */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -113,11 +113,22 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border-strong);
-  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.15);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.3);
+}
+
+/* Panel scrollbars - more visible */
+.overflow-auto::-webkit-scrollbar-thumb,
+table::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+}
+
+.overflow-auto::-webkit-scrollbar-thumb:hover,
+table::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-tertiary);
 }
 

@@ -53,17 +53,27 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose }) => 
                 {/* Content */}
                 <div className="p-6 space-y-4">
                     <p className="text-center text-gray-600 dark:text-gray-300">
-                        A fast, beautiful, and reliable FTP client built with modern technologies.
+                        More than FTP. A complete developer toolkit.
                     </p>
 
+                    {/* PRO Features */}
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400 py-2">
+                        <div className="flex items-center gap-1.5">✈️ Fast Rust Engine</div>
+                        <div className="flex items-center gap-1.5">📝 Monaco Editor</div>
+                        <div className="flex items-center gap-1.5">🖥️ Integrated Terminal</div>
+                        <div className="flex items-center gap-1.5">🤖 AI Assistant</div>
+                        <div className="flex items-center gap-1.5">🔒 Secure FTPS</div>
+                        <div className="flex items-center gap-1.5">🎨 Tokyo Night Theme</div>
+                    </div>
+
                     {/* Tech stack */}
-                    <div className="flex justify-center gap-4 py-3">
-                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                            <Cpu size={16} />
+                    <div className="flex justify-center gap-4 py-2 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                            <Cpu size={14} />
                             <span>Rust + Tauri</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                            <Globe size={16} />
+                        <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                            <Globe size={14} />
                             <span>React + TypeScript</span>
                         </div>
                     </div>
