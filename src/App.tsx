@@ -265,7 +265,8 @@ const App: React.FC = () => {
   const [showAboutDialog, setShowAboutDialog] = useState(false);
   const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
-  const [showMenuBar, setShowMenuBar] = useState(true);
+  const [showMenuBar, setShowMenuBar] = useState(true);  // Internal header visibility
+  const [systemMenuVisible, setSystemMenuVisible] = useState(true);  // Native system menu bar
   const [isSyncNavigation, setIsSyncNavigation] = useState(false); // Navigation Sync feature
   const [syncBasePaths, setSyncBasePaths] = useState<{ remote: string; local: string } | null>(null);
 
@@ -945,13 +946,17 @@ const App: React.FC = () => {
           <div className="flex items-center justify-between px-6 py-3">
             <Logo size="md" />
             <div className="flex items-center gap-3">
-              {/* Quick Menu Bar Toggle */}
+              {/* Quick System Menu Bar Toggle */}
               <button
-                onClick={() => setShowMenuBar(!showMenuBar)}
+                onClick={async () => {
+                  const newState = !systemMenuVisible;
+                  setSystemMenuVisible(newState);
+                  await invoke('toggle_menu_bar', { visible: newState });
+                }}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                title={showMenuBar ? 'Hide menu bar' : 'Show menu bar'}
+                title={systemMenuVisible ? 'Hide system menu bar' : 'Show system menu bar'}
               >
-                <PanelTop size={18} className={showMenuBar ? 'text-blue-500' : 'text-gray-400'} />
+                <PanelTop size={18} className={systemMenuVisible ? 'text-blue-500' : 'text-gray-400'} />
               </button>
               <ThemeToggle theme={theme} setTheme={setTheme} />
               {isConnected && (
@@ -962,17 +967,6 @@ const App: React.FC = () => {
             </div>
           </div>
         </header>
-      )}
-
-      {/* Floating button to show header when hidden */}
-      {!showMenuBar && (
-        <button
-          onClick={() => setShowMenuBar(true)}
-          className="fixed top-2 left-2 z-40 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          title="Show menu bar"
-        >
-          <PanelTop size={18} />
-        </button>
       )}
 
       <main className="flex-1 p-6 overflow-auto">
