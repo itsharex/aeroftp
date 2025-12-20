@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { X, Settings, Server, Upload, Palette, Trash2, Edit, Plus, FolderOpen, Wifi, FileCheck } from 'lucide-react';
 import { ServerProfile } from '../types';
 
@@ -388,13 +389,30 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                                                     onChange={e => setEditingServer({ ...editingServer, initialPath: e.target.value })}
                                                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
                                                 />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Local Path (optional)"
-                                                    value={editingServer.localInitialPath || ''}
-                                                    onChange={e => setEditingServer({ ...editingServer, localInitialPath: e.target.value })}
-                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
-                                                />
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Local Path (optional)"
+                                                        value={editingServer.localInitialPath || ''}
+                                                        onChange={e => setEditingServer({ ...editingServer, localInitialPath: e.target.value })}
+                                                        className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const selected = await open({ directory: true, multiple: false, title: 'Select Local Folder' });
+                                                                if (selected && typeof selected === 'string') {
+                                                                    setEditingServer({ ...editingServer, localInitialPath: selected });
+                                                                }
+                                                            } catch (e) { console.error('Folder picker error:', e); }
+                                                        }}
+                                                        className="px-3 py-2 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg transition-colors"
+                                                        title="Browse"
+                                                    >
+                                                        <FolderOpen size={16} />
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div className="flex gap-2 justify-end">
                                                 <button
