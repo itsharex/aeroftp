@@ -336,6 +336,87 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                                         ))}
                                     </div>
                                 )}
+
+                                {/* Edit Server Modal */}
+                                {editingServer && (
+                                    <div className="fixed inset-0 z-60 flex items-center justify-center">
+                                        <div className="absolute inset-0 bg-black/30" onClick={() => setEditingServer(null)} />
+                                        <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md space-y-4">
+                                            <h3 className="text-lg font-semibold">Edit Server</h3>
+                                            <div className="space-y-3">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Server Name"
+                                                    value={editingServer.name}
+                                                    onChange={e => setEditingServer({ ...editingServer, name: e.target.value })}
+                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+                                                />
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Host"
+                                                        value={editingServer.host}
+                                                        onChange={e => setEditingServer({ ...editingServer, host: e.target.value })}
+                                                        className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Port"
+                                                        value={editingServer.port}
+                                                        onChange={e => setEditingServer({ ...editingServer, port: parseInt(e.target.value) || 21 })}
+                                                        className="w-20 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+                                                    />
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Username"
+                                                    value={editingServer.username}
+                                                    onChange={e => setEditingServer({ ...editingServer, username: e.target.value })}
+                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+                                                />
+                                                <input
+                                                    type="password"
+                                                    placeholder="Password"
+                                                    value={editingServer.password || ''}
+                                                    onChange={e => setEditingServer({ ...editingServer, password: e.target.value })}
+                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Remote Path (optional)"
+                                                    value={editingServer.initialPath || ''}
+                                                    onChange={e => setEditingServer({ ...editingServer, initialPath: e.target.value })}
+                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Local Path (optional)"
+                                                    value={editingServer.localInitialPath || ''}
+                                                    onChange={e => setEditingServer({ ...editingServer, localInitialPath: e.target.value })}
+                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+                                                />
+                                            </div>
+                                            <div className="flex gap-2 justify-end">
+                                                <button
+                                                    onClick={() => setEditingServer(null)}
+                                                    className="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setServers(prev => prev.map(s => s.id === editingServer.id ? editingServer : s));
+                                                        setEditingServer(null);
+                                                        setHasChanges(true);
+                                                    }}
+                                                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+                                                >
+                                                    Save
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                         {activeTab === 'filehandling' && (

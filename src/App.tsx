@@ -485,8 +485,18 @@ const App: React.FC = () => {
   };
 
   const disconnectFromFtp = async () => {
-    try { await invoke('disconnect_ftp'); setIsConnected(false); setRemoteFiles([]); setCurrentRemotePath('/'); toast.info('Disconnected', 'Disconnected from server'); }
-    catch (error) { toast.error('Error', `Disconnection failed: ${error}`); }
+    try {
+      await invoke('disconnect_ftp');
+      setIsConnected(false);
+      setRemoteFiles([]);
+      setCurrentRemotePath('/');
+      // Close all session tabs on disconnect
+      setSessions([]);
+      setActiveSessionId(null);
+      toast.info('Disconnected', 'Disconnected from server');
+    } catch (error) {
+      toast.error('Error', `Disconnection failed: ${error}`);
+    }
   };
 
   // Session Management for Multi-Tab
