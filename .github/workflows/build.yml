@@ -51,10 +51,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'AeroFTP v__VERSION__'
+          tagName: v${{ github.ref_name }}
+          releaseName: 'AeroFTP v${{ github.ref_name }}'
           releaseBody: |
-            ## AeroFTP Release
+            ## AeroFTP Release ${{ github.ref_name }}
             
             ✨ **Features:**
             - Real AeroFTP logos with theme support
