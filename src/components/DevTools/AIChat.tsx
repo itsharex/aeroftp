@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Bot, User, Sparkles, Settings } from 'lucide-react';
+import { MessageSquare, Send, Bot, User, Sparkles } from 'lucide-react';
+import { GeminiIcon, OpenAIIcon, AnthropicIcon, AntigravityIcon } from './AIIcons';
 
 interface Message {
     id: string;
@@ -12,11 +13,19 @@ interface AIChatProps {
     className?: string;
 }
 
-const AI_MODELS = [
-    { id: 'gemini-2.0', name: 'Gemini 2.0 Flash', provider: 'Google', icon: '🚀' },
-    { id: 'claude-sonnet', name: 'Claude Sonnet 4', provider: 'Anthropic', icon: '🎭' },
-    { id: 'claude-opus', name: 'Claude Opus 4', provider: 'Anthropic (Antigravity)', icon: '🌌' },
-    { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', icon: '🧠' },
+interface AIModel {
+    id: string;
+    name: string;
+    provider: string;
+    icon: React.ReactNode;
+    color: string;
+}
+
+const AI_MODELS: AIModel[] = [
+    { id: 'gemini-2.0', name: 'Gemini 2.0 Flash', provider: 'Google', icon: <GeminiIcon size={14} />, color: '#4285F4' },
+    { id: 'claude-sonnet', name: 'Claude Sonnet 4', provider: 'Anthropic', icon: <AnthropicIcon size={14} />, color: '#D4A574' },
+    { id: 'claude-opus', name: 'Claude Opus 4', provider: 'Antigravity', icon: <AntigravityIcon size={14} />, color: '#9333ea' },
+    { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', icon: <OpenAIIcon size={14} />, color: '#10a37f' },
 ];
 
 export const AIChat: React.FC<AIChatProps> = ({ className = '' }) => {
@@ -107,24 +116,27 @@ Stay tuned for Phase 4! 🚀`,
                         onClick={() => setShowModelSelector(!showModelSelector)}
                         className="flex items-center gap-2 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
                     >
-                        <span>{selectedModel.icon}</span>
+                        <span style={{ color: selectedModel.color }}>{selectedModel.icon}</span>
                         <span>{selectedModel.name}</span>
                     </button>
 
                     {showModelSelector && (
-                        <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-10 py-1 min-w-[200px]">
+                        <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-10 py-1 min-w-[220px]">
                             {AI_MODELS.map(model => (
                                 <button
                                     key={model.id}
                                     onClick={() => { setSelectedModel(model); setShowModelSelector(false); }}
-                                    className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-700 flex items-center gap-2 ${selectedModel.id === model.id ? 'text-purple-400' : 'text-gray-300'
+                                    className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-700 flex items-center gap-2.5 ${selectedModel.id === model.id ? 'bg-gray-700/50' : ''
                                         }`}
                                 >
-                                    <span>{model.icon}</span>
+                                    <span style={{ color: model.color }} className="w-4">{model.icon}</span>
                                     <div className="flex flex-col">
-                                        <span className="font-medium">{model.name}</span>
+                                        <span className="font-medium text-gray-200">{model.name}</span>
                                         <span className="text-gray-500 text-[10px]">{model.provider}</span>
                                     </div>
+                                    {selectedModel.id === model.id && (
+                                        <span className="ml-auto text-green-400">✓</span>
+                                    )}
                                 </button>
                             ))}
                         </div>
@@ -146,8 +158,8 @@ Stay tuned for Phase 4! 🚀`,
                         )}
                         <div
                             className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${message.role === 'user'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-800 text-gray-200'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-800 text-gray-200'
                                 }`}
                         >
                             <div className="whitespace-pre-wrap">{message.content}</div>
