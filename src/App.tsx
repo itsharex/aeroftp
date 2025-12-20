@@ -1374,6 +1374,21 @@ const App: React.FC = () => {
         previewFile={devToolsPreviewFile}
         onClose={() => setDevToolsOpen(false)}
         onToggle={() => setDevToolsOpen(!devToolsOpen)}
+        onSaveFile={async (content, file) => {
+          try {
+            if (file.isRemote) {
+              await invoke('save_remote_file', { path: file.path, content });
+              toast.success('File Saved', `${file.name} saved to server`);
+              await loadRemoteFiles();
+            } else {
+              await invoke('save_local_file', { path: file.path, content });
+              toast.success('File Saved', `${file.name} saved locally`);
+              await loadLocalFiles(currentLocalPath);
+            }
+          } catch (error) {
+            toast.error('Save Failed', String(error));
+          }
+        }}
       />
 
       <StatusBar

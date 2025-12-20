@@ -1,13 +1,15 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Code, Terminal, Edit3, ChevronDown, ChevronUp, X, Maximize2, Minimize2 } from 'lucide-react';
-import { DevToolsTab, DevToolsState, PreviewFile } from './types';
+import { DevToolsTab, PreviewFile } from './types';
 import { FilePreview } from './FilePreview';
+import { CodeEditor } from './CodeEditor';
 
 interface DevToolsPanelProps {
     isOpen: boolean;
     previewFile: PreviewFile | null;
     onClose: () => void;
     onToggle: () => void;
+    onSaveFile?: (content: string, file: PreviewFile) => Promise<void>;
 }
 
 const DEFAULT_HEIGHT = 300;
@@ -19,6 +21,7 @@ export const DevToolsPanel: React.FC<DevToolsPanelProps> = ({
     previewFile,
     onClose,
     onToggle,
+    onSaveFile,
 }) => {
     const [activeTab, setActiveTab] = useState<DevToolsTab>('preview');
     const [height, setHeight] = useState(DEFAULT_HEIGHT);
@@ -61,7 +64,7 @@ export const DevToolsPanel: React.FC<DevToolsPanelProps> = ({
 
     const tabs: { id: DevToolsTab; label: string; icon: React.ReactNode; available: boolean }[] = [
         { id: 'preview', label: 'Preview', icon: <Code size={14} />, available: true },
-        { id: 'editor', label: 'Editor', icon: <Edit3 size={14} />, available: false },  // Phase 2
+        { id: 'editor', label: 'Editor', icon: <Edit3 size={14} />, available: true },  // Phase 2 - NOW ACTIVE!
         { id: 'terminal', label: 'Terminal', icon: <Terminal size={14} />, available: false },  // Phase 3
     ];
 
@@ -100,10 +103,10 @@ export const DevToolsPanel: React.FC<DevToolsPanelProps> = ({
                                 onClick={() => tab.available && setActiveTab(tab.id)}
                                 disabled={!tab.available}
                                 className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs transition-colors ${activeTab === tab.id
-                                        ? 'bg-gray-700 text-white'
-                                        : tab.available
-                                            ? 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                                            : 'text-gray-600 cursor-not-allowed'
+                                    ? 'bg-gray-700 text-white'
+                                    : tab.available
+                                        ? 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                                        : 'text-gray-600 cursor-not-allowed'
                                     }`}
                                 title={!tab.available ? 'Coming soon' : tab.label}
                             >
@@ -139,10 +142,16 @@ export const DevToolsPanel: React.FC<DevToolsPanelProps> = ({
                     <FilePreview file={previewFile} className="h-full" />
                 )}
                 {activeTab === 'editor' && (
-                    <div className="flex items-center justify-center h-full text-gray-500">
-                        <Edit3 size={32} className="mr-2 opacity-30" />
-                        <span>Monaco Editor - Coming in Phase 2</span>
-                    </div>
+                    <CodeEditor
+                        file={previewFile}
+                        onSave={async (content) => {
+                            if (onSaveFile && previewFile) {
+                                await onSaveFile(content, previewFile);
+                            }
+                        }}
+                        onClose={() => setActiveTab('preview')}
+                        className="h-full"
+                    />
                 )}
                 {activeTab === 'terminal' && (
                     <div className="flex items-center justify-center h-full text-gray-500">

@@ -606,6 +606,39 @@ async fn preview_remote_file(state: State<'_, AppState>, path: String) -> Result
 }
 
 #[tauri::command]
+async fn save_local_file(path: String, content: String) -> Result<(), String> {
+    // Write content to local file
+    tokio::fs::write(&path, content)
+        .await
+        .map_err(|e| format!("Failed to save file: {}", e))?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn save_remote_file(state: State<'_, AppState>, path: String, content: String) -> Result<(), String> {
+    let mut ftp_manager = state.ftp_manager.lock().await;
+    
+    // Write content to temp file first
+    let temp_path = std::env::temp_dir().join(format!("aeroftp_upload_{}", chrono::Utc::now().timestamp_millis()));
+    let temp_path_str = temp_path.to_string_lossy().to_string();
+    
+    tokio::fs::write(&temp_path, &content)
+        .await
+        .map_err(|e| format!("Failed to write temp file: {}", e))?;
+    
+    // Upload to remote server
+    ftp_manager.upload_file_with_progress(&temp_path_str, &path, content.len() as u64, |_| {})
+        .await
+        .map_err(|e| format!("Failed to upload file: {}", e))?;
+    
+    // Clean up temp file
+    let _ = tokio::fs::remove_file(&temp_path).await;
+    
+    Ok(())
+}
+
+#[tauri::command]
 fn toggle_menu_bar(app: AppHandle, window: tauri::Window, visible: bool) {
     if visible {
         if let Some(menu) = app.menu() {
@@ -719,6 +752,8 @@ pub fn run() {
             read_file_base64,
             read_local_file,
             preview_remote_file,
+            save_local_file,
+            save_remote_file,
             toggle_menu_bar
         ])
         .run(tauri::generate_context!())
