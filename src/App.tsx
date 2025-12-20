@@ -6,8 +6,9 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir, downloadDir } from '@tauri-apps/api/path';
 import {
   FileListResponse, ConnectionParams, DownloadParams, UploadParams,
-  LocalFile, TransferEvent, TransferProgress, RemoteFile
+  LocalFile, TransferEvent, TransferProgress, RemoteFile, FtpSession
 } from './types';
+import { SessionTabs } from './components/SessionTabs';
 import { PermissionsDialog } from './components/PermissionsDialog';
 import { ToastContainer, useToast } from './components/Toast';
 import { Logo } from './components/Logo';
@@ -246,6 +247,7 @@ const App: React.FC = () => {
   const [currentRemotePath, setCurrentRemotePath] = useState('/');
   const [currentLocalPath, setCurrentLocalPath] = useState('');
   const [connectionParams, setConnectionParams] = useState<ConnectionParams>({ server: '', username: '', password: '' });
+  const [quickConnectDirs, setQuickConnectDirs] = useState({ remoteDir: '', localDir: '' });
   const [loading, setLoading] = useState(false);
   const [activeTransfer, setActiveTransfer] = useState<TransferProgress | null>(null);
   const [activePanel, setActivePanel] = useState<'remote' | 'local'>('remote');
@@ -266,6 +268,10 @@ const App: React.FC = () => {
   const [showMenuBar, setShowMenuBar] = useState(true);
   const [isSyncNavigation, setIsSyncNavigation] = useState(false); // Navigation Sync feature
   const [syncBasePaths, setSyncBasePaths] = useState<{ remote: string; local: string } | null>(null);
+
+  // Multi-Session Tabs (Hybrid Cache Architecture)
+  const [sessions, setSessions] = useState<FtpSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   // Upload Queue
   const uploadQueue = useUploadQueue();
@@ -463,7 +469,16 @@ const App: React.FC = () => {
       await invoke('connect_ftp', { params: connectionParams });
       setIsConnected(true);
       toast.success('Connected', `Connected to ${connectionParams.server}`);
-      await loadRemoteFiles();
+      // Navigate to initial remote directory if specified
+      if (quickConnectDirs.remoteDir) {
+        await changeRemoteDirectory(quickConnectDirs.remoteDir);
+      } else {
+        await loadRemoteFiles();
+      }
+      // Navigate to initial local directory if specified
+      if (quickConnectDirs.localDir) {
+        await changeLocalDirectory(quickConnectDirs.localDir);
+      }
     } catch (error) { toast.error('Connection Failed', String(error)); }
     finally { setLoading(false); }
   };
@@ -471,6 +486,90 @@ const App: React.FC = () => {
   const disconnectFromFtp = async () => {
     try { await invoke('disconnect_ftp'); setIsConnected(false); setRemoteFiles([]); setCurrentRemotePath('/'); toast.info('Disconnected', 'Disconnected from server'); }
     catch (error) { toast.error('Error', `Disconnection failed: ${error}`); }
+  };
+
+  // Session Management for Multi-Tab
+  const createSession = (serverName: string, params: ConnectionParams, remotePath: string, localPath: string) => {
+    const newSession: FtpSession = {
+      id: `session_${Date.now()}`,
+      serverId: serverName,
+      serverName,
+      status: 'connected',
+      remotePath,
+      localPath,
+      remoteFiles: [...remoteFiles],
+      localFiles: [...localFiles],
+      lastActivity: new Date(),
+      connectionParams: params,
+    };
+    setSessions(prev => [...prev, newSession]);
+    setActiveSessionId(newSession.id);
+  };
+
+  const switchSession = async (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    // Save current session state before switching
+    if (activeSessionId) {
+      setSessions(prev => prev.map(s =>
+        s.id === activeSessionId
+          ? { ...s, remoteFiles: [...remoteFiles], localFiles: [...localFiles], remotePath: currentRemotePath, localPath: currentLocalPath }
+          : s
+      ));
+    }
+
+    // Load cached data immediately (zero latency UX)
+    setRemoteFiles(session.remoteFiles);
+    setLocalFiles(session.localFiles);
+    setCurrentRemotePath(session.remotePath);
+    setCurrentLocalPath(session.localPath);
+    setConnectionParams(session.connectionParams);
+    setActiveSessionId(sessionId);
+
+    // Background reconnect if needed
+    if (session.status === 'cached' || session.status === 'disconnected') {
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connecting' } : s));
+      try {
+        await invoke('connect_ftp', { params: session.connectionParams });
+        await invoke('change_directory', { path: session.remotePath });
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connected' } : s));
+        // Silent refresh
+        const response: FileListResponse = await invoke('list_files');
+        setRemoteFiles(response.files);
+      } catch {
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'cached' } : s));
+      }
+    }
+  };
+
+  const closeSession = async (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    // If closing active session, switch to another or disconnect
+    if (sessionId === activeSessionId) {
+      const remaining = sessions.filter(s => s.id !== sessionId);
+      if (remaining.length > 0) {
+        await switchSession(remaining[0].id);
+      } else {
+        await disconnectFromFtp();
+      }
+    }
+
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
+  };
+
+  const handleNewTabFromSavedServer = () => {
+    // Mark current session as cached and go to connection screen
+    if (activeSessionId) {
+      setSessions(prev => prev.map(s =>
+        s.id === activeSessionId
+          ? { ...s, status: 'cached', remoteFiles: [...remoteFiles], localFiles: [...localFiles], remotePath: currentRemotePath, localPath: currentLocalPath }
+          : s
+      ));
+    }
+    setIsConnected(false);
   };
 
   const changeRemoteDirectory = async (path: string) => {
@@ -874,7 +973,32 @@ const App: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Password</label>
-                  <input type="password" value={connectionParams.password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConnectionParams({ ...connectionParams, password: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" placeholder="Password" onKeyPress={(e: React.KeyboardEvent) => e.key === 'Enter' && connectToFtp()} />
+                  <input type="password" value={connectionParams.password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConnectionParams({ ...connectionParams, password: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" placeholder="Password" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Remote Directory</label>
+                  <input type="text" value={quickConnectDirs.remoteDir} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuickConnectDirs({ ...quickConnectDirs, remoteDir: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" placeholder="/www (optional)" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Local Directory</label>
+                  <div className="flex gap-2">
+                    <input type="text" value={quickConnectDirs.localDir} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuickConnectDirs({ ...quickConnectDirs, localDir: e.target.value })} className="flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" placeholder="/home/user/projects (optional)" />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const selected = await open({ directory: true, multiple: false, title: 'Select Local Directory' });
+                          if (selected && typeof selected === 'string') {
+                            setQuickConnectDirs({ ...quickConnectDirs, localDir: selected });
+                          }
+                        } catch (e) { console.error('Folder picker error:', e); }
+                      }}
+                      className="px-4 py-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-xl transition-colors"
+                      title="Browse"
+                    >
+                      <FolderOpen size={18} />
+                    </button>
+                  </div>
                 </div>
                 <button onClick={connectToFtp} disabled={loading} className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium py-3 rounded-xl disabled:opacity-50">
                   {loading ? 'Connecting...' : 'Connect'}
@@ -900,6 +1024,13 @@ const App: React.FC = () => {
                   if (localInitialPath) {
                     await changeLocalDirectory(localInitialPath);
                   }
+                  // Create session for multi-tab management
+                  createSession(
+                    params.server.split(':')[0], // Use hostname as server name
+                    params,
+                    initialPath || currentRemotePath,
+                    localInitialPath || currentLocalPath
+                  );
                 } catch (error) {
                   toast.error('Connection Failed', String(error));
                 } finally {
@@ -910,6 +1041,16 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
+            {/* Session Tabs - visible when there are sessions */}
+            {sessions.length > 0 && (
+              <SessionTabs
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                onTabClick={switchSession}
+                onTabClose={closeSession}
+                onNewTab={handleNewTabFromSavedServer}
+              />
+            )}
             {/* Toolbar */}
             <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
               <div className="flex gap-2">
@@ -935,8 +1076,8 @@ const App: React.FC = () => {
                     <button
                       onClick={toggleSyncNavigation}
                       className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 transition-colors ${isSyncNavigation
-                          ? 'bg-purple-500 hover:bg-purple-600 text-white'
-                          : 'bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500'
+                        ? 'bg-purple-500 hover:bg-purple-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500'
                         }`}
                       title={isSyncNavigation ? 'Navigation Sync ON - Click to disable' : 'Enable Navigation Sync between panels'}
                     >

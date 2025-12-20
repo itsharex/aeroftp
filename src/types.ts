@@ -90,3 +90,26 @@ export interface AppState {
 
 // Theme type
 export type Theme = 'light' | 'dark' | 'system';
+
+// Session status for multi-tab management
+export type SessionStatus = 'connected' | 'disconnected' | 'connecting' | 'cached';
+
+// FTP Session for multi-session tabs (Hybrid Cache Architecture)
+export interface FtpSession {
+  id: string;
+  serverId: string;              // Reference to ServerProfile.id
+  serverName: string;            // Display name for tab
+  status: SessionStatus;
+  remotePath: string;
+  localPath: string;
+  remoteFiles: RemoteFile[];     // Cached file list
+  localFiles: LocalFile[];       // Cached local files
+  lastActivity: Date;
+  connectionParams: ConnectionParams;
+}
+
+// State for managing multiple tabs
+export interface TabsState {
+  sessions: FtpSession[];
+  activeSessionId: string | null;
+}

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Server, Plus, Trash2, Star, Edit2, X, Check, FolderOpen } from 'lucide-react';
+import { open } from '@tauri-apps/plugin-dialog';
 import { ServerProfile, ConnectionParams } from '../types';
 
 interface SavedServersProps {
@@ -223,7 +224,6 @@ export const SavedServers: React.FC<SavedServersProps> = ({ onConnect, className
                         className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
                     />
                     <div className="flex items-center gap-2">
-                        <FolderOpen size={16} className="text-gray-400" />
                         <input
                             type="text"
                             placeholder="Local Path (e.g. /home/user/projects/mysite)"
@@ -231,6 +231,27 @@ export const SavedServers: React.FC<SavedServersProps> = ({ onConnect, className
                             onChange={e => setFormData({ ...formData, localInitialPath: e.target.value })}
                             className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
                         />
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    const selected = await open({
+                                        directory: true,
+                                        multiple: false,
+                                        title: 'Select Local Project Folder'
+                                    });
+                                    if (selected && typeof selected === 'string') {
+                                        setFormData({ ...formData, localInitialPath: selected });
+                                    }
+                                } catch (e) {
+                                    console.error('Failed to open folder picker:', e);
+                                }
+                            }}
+                            className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                            title="Browse for folder"
+                        >
+                            <FolderOpen size={16} />
+                        </button>
                     </div>
                     <button
                         onClick={handleSave}
