@@ -1087,6 +1087,19 @@ pub fn run() {
             )?;
             
             // View menu
+            let devtools_submenu = Submenu::with_items(
+                app,
+                "DevTools",
+                true,
+                &[
+                    &MenuItem::with_id(app, "toggle_devtools", "Toggle DevTools", true, Some("CmdOrCtrl+Shift+D"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(app, "toggle_editor", "Toggle Editor", true, Some("CmdOrCtrl+1"))?,
+                    &MenuItem::with_id(app, "toggle_terminal", "Toggle Terminal", true, Some("CmdOrCtrl+2"))?,
+                    &MenuItem::with_id(app, "toggle_agent", "Toggle Agent", true, Some("CmdOrCtrl+3"))?,
+                ],
+            )?;
+            
             let view_menu = Submenu::with_items(
                 app,
                 "View",
@@ -1095,6 +1108,8 @@ pub fn run() {
                     &refresh,
                     &PredefinedMenuItem::separator(app)?,
                     &MenuItem::with_id(app, "toggle_theme", "Toggle Theme", true, Some("CmdOrCtrl+T"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &devtools_submenu,
                 ],
             )?;
             

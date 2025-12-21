@@ -128,7 +128,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     };
 
     const themes: { id: EditorTheme; name: string; icon: string }[] = [
-        { id: 'tokyo-night', name: 'Tokyo Night 🌃', icon: '🌃' },
+        { id: 'tokyo-night', name: 'Tokyo Night', icon: '🌃' },
         { id: 'vs-dark', name: 'VS Dark', icon: '🌑' },
     ];
 

@@ -478,6 +478,15 @@ const App: React.FC = () => {
         case 'new_folder':
           if (isConnected) createFolder(true);
           break;
+        case 'toggle_devtools':
+          setDevToolsOpen(prev => !prev);
+          break;
+        case 'toggle_editor':
+        case 'toggle_terminal':
+        case 'toggle_agent':
+          // Emit event for DevToolsV2 to handle
+          window.dispatchEvent(new CustomEvent('devtools-panel-toggle', { detail: id.replace('toggle_', '') }));
+          break;
         case 'quit':
           // Will be handled by Tauri
           break;
@@ -1475,6 +1484,7 @@ const App: React.FC = () => {
         localPath={currentLocalPath}
         remotePath={currentRemotePath}
         onClose={() => setDevToolsOpen(false)}
+        onClearFile={() => setDevToolsPreviewFile(null)}
         onSaveFile={async (content, file) => {
           try {
             if (file.isRemote) {

@@ -12,6 +12,7 @@ interface DevToolsV2Props {
     remotePath?: string;
     onClose: () => void;
     onSaveFile?: (content: string, file: PreviewFile) => Promise<void>;
+    onClearFile?: () => void;
 }
 
 type PanelVisibility = {
@@ -33,6 +34,7 @@ export const DevToolsV2: React.FC<DevToolsV2Props> = ({
     remotePath,
     onClose,
     onSaveFile,
+    onClearFile,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState(window.innerWidth);
@@ -63,6 +65,16 @@ export const DevToolsV2: React.FC<DevToolsV2Props> = ({
         // Listen to window resize
         window.addEventListener('resize', updateWidth);
 
+        // Listen for menu-triggered panel toggles
+        const handleMenuToggle = (e: Event) => {
+            const panel = (e as CustomEvent).detail as string;
+            if (panel === 'editor' || panel === 'terminal' || panel === 'agent') {
+                const key = panel === 'agent' ? 'chat' : panel;
+                setPanels(prev => ({ ...prev, [key]: !prev[key as keyof PanelVisibility] }));
+            }
+        };
+        window.addEventListener('devtools-panel-toggle', handleMenuToggle);
+
         // Also use ResizeObserver for container-specific changes
         let observer: ResizeObserver | null = null;
         if (containerRef.current) {
@@ -72,6 +84,7 @@ export const DevToolsV2: React.FC<DevToolsV2Props> = ({
 
         return () => {
             window.removeEventListener('resize', updateWidth);
+            window.removeEventListener('devtools-panel-toggle', handleMenuToggle);
             observer?.disconnect();
         };
     }, [isOpen]);
@@ -112,7 +125,8 @@ export const DevToolsV2: React.FC<DevToolsV2Props> = ({
         const handleMouseMove = (moveEvent: MouseEvent) => {
             if (!isDragging.current) return;
             const delta = startY - moveEvent.clientY;
-            const newHeight = Math.min(800, Math.max(200, startHeight + delta));
+            const maxHeight = window.innerHeight - 120; // Leave space for header/statusbar
+            const newHeight = Math.min(maxHeight, Math.max(200, startHeight + delta));
             setHeight(newHeight);
         };
 
@@ -134,11 +148,17 @@ export const DevToolsV2: React.FC<DevToolsV2Props> = ({
 
     const panelWidth = visiblePanels.length > 0 ? `${100 / visiblePanels.length}%` : '100%';
 
+    // Max height: leave space for header/tabs (~110px) and statusbar (~40px)  
+    const maxHeight = 'calc(100vh - 150px)';
+
     return (
         <div
             ref={containerRef}
-            className="bg-gray-900 text-gray-100 border-t border-gray-700 flex flex-col"
-            style={{ height: isMaximized ? '80vh' : height }}
+            className="bg-gray-900 text-gray-100 border-t border-gray-700 flex flex-col flex-shrink-0"
+            style={{
+                height: isMaximized ? maxHeight : height,
+                maxHeight: maxHeight
+            }}
         >
             {/* Resize handle */}
             <div
@@ -182,18 +202,11 @@ export const DevToolsV2: React.FC<DevToolsV2Props> = ({
                                 ? 'bg-purple-600 text-white'
                                 : 'text-gray-400 hover:text-white hover:bg-gray-700'
                                 }`}
-                            title="Toggle AI Chat"
+                            title="Toggle Agent"
                         >
                             <MessageSquare size={12} />
-                            AI
+                            Agent
                         </button>
-                    </div>
-
-                    {/* Responsive indicator */}
-                    <div className="ml-2 text-gray-500" title={`${visiblePanels.length} column${visiblePanels.length !== 1 ? 's' : ''} visible`}>
-                        {containerWidth < BREAKPOINTS.TWO_COLS && <LayoutList size={14} />}
-                        {containerWidth >= BREAKPOINTS.TWO_COLS && containerWidth < BREAKPOINTS.THREE_COLS && <Columns2 size={14} />}
-                        {containerWidth >= BREAKPOINTS.THREE_COLS && <Columns3 size={14} />}
                     </div>
                 </div>
 
@@ -243,7 +256,7 @@ export const DevToolsV2: React.FC<DevToolsV2Props> = ({
                                                 await onSaveFile(content, previewFile);
                                             }
                                         }}
-                                        onClose={() => { }}
+                                        onClose={() => onClearFile?.()}
                                         className="h-full"
                                     />
                                 </div>
@@ -282,7 +295,7 @@ export const DevToolsV2: React.FC<DevToolsV2Props> = ({
                     </>
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 
