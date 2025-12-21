@@ -1,5 +1,5 @@
 name: aeroftp
-version: '0.5.5'
+version: '0.5.6'
 summary: Fast, Beautiful, Reliable FTP Client built with Tauri
 description: |
   AeroFTP is a modern FTP client that combines beauty and functionality.
@@ -27,8 +27,8 @@ icon: icons/AeroFTP_simbol_color_512x512.png
 
 apps:
   aeroftp:
-    command: aeroftp
-    desktop: usr/share/applications/aeroftp.desktop
+    command: usr/bin/aeroftp
+    desktop: snap/gui/aeroftp.desktop
     extensions:
       - gnome
     plugs:
@@ -45,48 +45,25 @@ apps:
 
 parts:
   aeroftp:
-    plugin: nil
+    plugin: dump
     source: .
-    build-packages:
-      - curl
-      - wget
-      - libwebkit2gtk-4.1-dev
-      - libappindicator3-dev
-      - librsvg2-dev
-      - patchelf
-      - libssl-dev
-      - build-essential
-      - pkg-config
     stage-packages:
       - libwebkit2gtk-4.1-0
       - libappindicator3-1
       - librsvg2-2
       - libayatana-appindicator3-1
+    organize:
+      src-tauri/target/release/aeroftp: usr/bin/aeroftp
+      icons/AeroFTP_simbol_color_512x512.png: usr/share/icons/hicolor/256x256/apps/aeroftp.png
+    stage:
+      - usr/bin/aeroftp
+      - usr/share/icons/hicolor/256x256/apps/aeroftp.png
     override-build: |
-      # Install Node.js
-      curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-      apt-get install -y nodejs
-      
-      # Install Rust
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-      export PATH="$HOME/.cargo/bin:$PATH"
-      
-      # Build the application
-      npm ci
-      npm run tauri build
-      
-      # Install to snap
+      # Copy pre-built binary
       mkdir -p $SNAPCRAFT_PART_INSTALL/usr/bin
-      mkdir -p $SNAPCRAFT_PART_INSTALL/usr/share/applications
       mkdir -p $SNAPCRAFT_PART_INSTALL/usr/share/icons/hicolor/256x256/apps
       
-      # Copy binary
-      cp src-tauri/target/release/aeroftp $SNAPCRAFT_PART_INSTALL/usr/bin/
-      
-      # Copy desktop file
-      cp src-tauri/target/release/bundle/deb/*/data/usr/share/applications/*.desktop $SNAPCRAFT_PART_INSTALL/usr/share/applications/aeroftp.desktop || true
-      
-      # Copy icon
+      cp src-tauri/target/release/aeroftp $SNAPCRAFT_PART_INSTALL/usr/bin/ || echo "Binary not found, will be built by workflow"
       cp icons/AeroFTP_simbol_color_512x512.png $SNAPCRAFT_PART_INSTALL/usr/share/icons/hicolor/256x256/apps/aeroftp.png
 
 layout:
