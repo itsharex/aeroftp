@@ -83,6 +83,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
         localStorage.setItem(SERVERS_KEY, JSON.stringify(servers));
         // Apply system menu setting immediately
         invoke('toggle_menu_bar', { visible: settings.showSystemMenu });
+        // Notify App.tsx of settings change (for compactMode etc)
+        window.dispatchEvent(new CustomEvent('aeroftp-settings-changed'));
         setHasChanges(false);
         onClose();
     };
@@ -288,7 +290,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                             <div className="space-y-6">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Saved Servers</h3>
-                                    <button className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1.5">
+                                    <button
+                                        onClick={() => setEditingServer({ id: crypto.randomUUID(), name: '', host: '', port: 21, username: '', password: '' })}
+                                        className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1.5"
+                                    >
                                         <Plus size={14} /> Add Server
                                     </button>
                                 </div>
@@ -423,7 +428,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                                                 </button>
                                                 <button
                                                     onClick={() => {
-                                                        setServers(prev => prev.map(s => s.id === editingServer.id ? editingServer : s));
+                                                        const exists = servers.some(s => s.id === editingServer.id);
+                                                        if (exists) {
+                                                            setServers(prev => prev.map(s => s.id === editingServer.id ? editingServer : s));
+                                                        } else {
+                                                            setServers(prev => [...prev, editingServer]);
+                                                        }
                                                         setEditingServer(null);
                                                         setHasChanges(true);
                                                     }}
@@ -539,18 +549,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Interface Settings</h3>
 
                                 <div className="space-y-4">
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={settings.showStatusBar}
-                                            onChange={e => updateSetting('showStatusBar', e.target.checked)}
-                                            className="w-4 h-4 rounded"
-                                        />
-                                        <div>
-                                            <p className="font-medium">Show Status Bar</p>
-                                            <p className="text-sm text-gray-500">Display transfer speed and connection info at bottom</p>
-                                        </div>
-                                    </label>
 
                                     <label className="flex items-center gap-3 cursor-pointer">
                                         <input

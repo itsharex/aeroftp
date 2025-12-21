@@ -510,3 +510,242 @@ tbody tr:hover .lucide-file-text {
   mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
 }
+
+/* ======================================
+   Compact Mode - Smaller fonts & spacing
+   ====================================== */
+
+.compact-mode {
+  font-size: 12px;
+}
+
+.compact-mode body {
+  font-size: 12px;
+}
+
+/* Compact file list items */
+.compact-mode .file-item {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Compact table rows */
+.compact-mode tbody tr td {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.compact-mode thead tr th {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.7rem;
+}
+
+/* Compact buttons */
+.compact-mode button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.compact-mode .btn-primary,
+.compact-mode .btn-secondary,
+.compact-mode .btn-danger {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+/* Compact headers */
+.compact-mode .panel-header {
+  padding: 0.375rem 0.75rem;
+}
+
+/* Compact inputs */
+.compact-mode input,
+.compact-mode select {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Compact general spacing */
+.compact-mode .p-4 {
+  padding: 0.75rem;
+}
+
+.compact-mode .p-3 {
+  padding: 0.5rem;
+}
+
+.compact-mode .p-2 {
+  padding: 0.375rem;
+}
+
+.compact-mode .px-4 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.compact-mode .px-3 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.compact-mode .py-2 {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+.compact-mode .gap-4 {
+  gap: 0.75rem;
+}
+
+.compact-mode .gap-3 {
+  gap: 0.5rem;
+}
+
+.compact-mode .gap-2 {
+  gap: 0.375rem;
+}
+
+/* Compact text */
+.compact-mode .text-sm {
+  font-size: 0.7rem;
+}
+
+.compact-mode .text-xs {
+  font-size: 0.65rem;
+}
+
+.compact-mode .text-base {
+  font-size: 0.75rem;
+}
+
+.compact-mode .text-lg {
+  font-size: 0.875rem;
+}
+
+/* ======================================
+   File Grid View Styles
+   ====================================== */
+
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.file-grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: transparent;
+  text-align: center;
+  min-height: 100px;
+}
+
+.file-grid-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.file-grid-item.selected {
+  background: rgba(0, 113, 227, 0.15);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.dark .file-grid-item.selected {
+  background: rgba(10, 132, 255, 0.2);
+}
+
+.file-grid-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.file-grid-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.file-grid-thumbnail {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: var(--color-bg-tertiary);
+  box-shadow: var(--shadow-sm);
+}
+
+.file-grid-name {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--color-text-primary);
+  word-break: break-word;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.file-grid-size {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+/* Go Up grid item */
+.file-grid-go-up {
+  opacity: 0.7;
+}
+
+.file-grid-go-up:hover {
+  opacity: 1;
+}
+
+/* Compact mode grid adjustments */
+.compact-mode .file-grid {
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+.compact-mode .file-grid-item {
+  padding: 8px 6px;
+  min-height: 80px;
+}
+
+.compact-mode .file-grid-icon {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 6px;
+}
+
+.compact-mode .file-grid-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.compact-mode .file-grid-thumbnail {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 6px;
+}
+
+.compact-mode .file-grid-name {
+  font-size: 10px;
+}
+
+.compact-mode .file-grid-size {
+  font-size: 9px;
+}

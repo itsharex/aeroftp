@@ -564,6 +564,32 @@ async fn read_file_base64(path: String) -> Result<String, String> {
     Ok(STANDARD.encode(data))
 }
 
+#[tauri::command]
+async fn ftp_read_file_base64(state: State<'_, AppState>, path: String) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    
+    let mut ftp_manager = state.ftp_manager.lock().await;
+    
+    // Limit size for thumbnails (500KB should be enough for most images to generate thumbnails)
+    let max_size: u64 = 500 * 1024;
+    
+    // Get file size first
+    let file_size = ftp_manager.get_file_size(&path)
+        .await
+        .unwrap_or(0);
+    
+    if file_size > max_size {
+        return Err(format!("File too large for thumbnail ({} KB). Max: 500 KB", file_size / 1024));
+    }
+    
+    // Download to memory
+    let data = ftp_manager.download_to_bytes(&path)
+        .await
+        .map_err(|e| format!("Failed to download: {}", e))?;
+    
+    Ok(STANDARD.encode(data))
+}
+
 // ============ DevTools Commands ============
 
 #[tauri::command]
@@ -1161,6 +1187,7 @@ pub fn run() {
             rename_local_file,
             create_local_folder,
             read_file_base64,
+            ftp_read_file_base64,
             read_local_file,
             preview_remote_file,
             save_local_file,

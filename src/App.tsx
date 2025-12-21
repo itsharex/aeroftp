@@ -26,7 +26,9 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import {
   Sun, Moon, Monitor, FolderUp, RefreshCw, FolderPlus, FolderOpen,
   Download, Upload, Pencil, Trash2, X, ArrowUp, ArrowDown,
-  Folder, FileText, Globe, HardDrive, Settings, Search, Eye, Link2, Unlink, PanelTop, Shield, Cloud
+  Folder, FileText, Globe, HardDrive, Settings, Search, Eye, Link2, Unlink, PanelTop, Shield, Cloud,
+  Archive, Image, Video, FileCode, Music, File, FileSpreadsheet, FileType, Code, Database,
+  Copy, Clipboard, ExternalLink, List, LayoutGrid
 } from 'lucide-react';
 
 // ============ Utility Functions ============
@@ -44,6 +46,158 @@ const formatETA = (seconds: number): string => {
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+};
+
+// Format date string from "2025-12-17 00:36" to "Dec 17 00:36" to match remote format
+const formatDate = (dateStr: string | null): string => {
+  if (!dateStr) return '-';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/);
+  if (match) {
+    const month = months[parseInt(match[2], 10) - 1];
+    const day = parseInt(match[3], 10);
+    return `${month} ${day} ${match[4]}`;
+  }
+  return dateStr;
+};
+
+// Get file icon and color based on extension
+const getFileIcon = (filename: string, size: number = 16): { icon: React.ReactNode; color: string } => {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+
+  // Special icons for specific file types
+  const iconMap: Record<string, { Icon: React.FC<{ size?: number; className?: string }>; color: string }> = {
+    // Archives
+    'zip': { Icon: Archive, color: 'text-yellow-600' },
+    'rar': { Icon: Archive, color: 'text-yellow-600' },
+    'tar': { Icon: Archive, color: 'text-yellow-600' },
+    'gz': { Icon: Archive, color: 'text-yellow-600' },
+    '7z': { Icon: Archive, color: 'text-yellow-600' },
+    // Images
+    'jpg': { Icon: Image, color: 'text-pink-400' },
+    'jpeg': { Icon: Image, color: 'text-pink-400' },
+    'png': { Icon: Image, color: 'text-pink-400' },
+    'gif': { Icon: Image, color: 'text-pink-400' },
+    'svg': { Icon: Image, color: 'text-orange-400' },
+    'webp': { Icon: Image, color: 'text-pink-400' },
+    'ico': { Icon: Image, color: 'text-pink-300' },
+    'bmp': { Icon: Image, color: 'text-pink-400' },
+    // Video
+    'mp4': { Icon: Video, color: 'text-purple-400' },
+    'webm': { Icon: Video, color: 'text-purple-400' },
+    'avi': { Icon: Video, color: 'text-purple-400' },
+    'mkv': { Icon: Video, color: 'text-purple-400' },
+    'mov': { Icon: Video, color: 'text-purple-400' },
+    // Audio
+    'mp3': { Icon: Music, color: 'text-green-400' },
+    'wav': { Icon: Music, color: 'text-green-400' },
+    'flac': { Icon: Music, color: 'text-green-400' },
+    'ogg': { Icon: Music, color: 'text-green-400' },
+    // Code files with FileCode icon
+    'php': { Icon: FileCode, color: 'text-purple-500' },
+    'js': { Icon: FileCode, color: 'text-yellow-400' },
+    'jsx': { Icon: FileCode, color: 'text-yellow-400' },
+    'ts': { Icon: FileCode, color: 'text-blue-500' },
+    'tsx': { Icon: FileCode, color: 'text-blue-500' },
+    'py': { Icon: FileCode, color: 'text-yellow-400' },
+    'rb': { Icon: FileCode, color: 'text-red-500' },
+    'go': { Icon: FileCode, color: 'text-cyan-400' },
+    'rs': { Icon: FileCode, color: 'text-orange-600' },
+    'java': { Icon: FileCode, color: 'text-red-400' },
+    'c': { Icon: FileCode, color: 'text-blue-400' },
+    'cpp': { Icon: FileCode, color: 'text-blue-500' },
+    'h': { Icon: FileCode, color: 'text-purple-400' },
+    'cs': { Icon: FileCode, color: 'text-green-500' },
+    'swift': { Icon: FileCode, color: 'text-orange-500' },
+    'kt': { Icon: FileCode, color: 'text-purple-500' },
+    'vue': { Icon: FileCode, color: 'text-green-500' },
+    'svelte': { Icon: FileCode, color: 'text-orange-600' },
+    // CSS/Style
+    'css': { Icon: Code, color: 'text-blue-400' },
+    'scss': { Icon: Code, color: 'text-pink-400' },
+    'sass': { Icon: Code, color: 'text-pink-400' },
+    'less': { Icon: Code, color: 'text-blue-300' },
+    // HTML
+    'html': { Icon: Globe, color: 'text-orange-500' },
+    'htm': { Icon: Globe, color: 'text-orange-500' },
+    // Data
+    'json': { Icon: FileType, color: 'text-yellow-500' },
+    'xml': { Icon: FileType, color: 'text-orange-400' },
+    'yaml': { Icon: FileType, color: 'text-red-400' },
+    'yml': { Icon: FileType, color: 'text-red-400' },
+    'sql': { Icon: Database, color: 'text-cyan-500' },
+    // Spreadsheets
+    'xls': { Icon: FileSpreadsheet, color: 'text-green-600' },
+    'xlsx': { Icon: FileSpreadsheet, color: 'text-green-600' },
+    'csv': { Icon: FileSpreadsheet, color: 'text-green-500' },
+  };
+
+  const entry = iconMap[ext];
+  if (entry) {
+    const { Icon, color } = entry;
+    return { icon: <Icon size={size} className={color} />, color };
+  }
+
+  // Fallback color map for other file types
+  const colorMap: Record<string, string> = {
+    'md': 'text-blue-300',
+    'txt': 'text-gray-400',
+    'pdf': 'text-red-500',
+    'doc': 'text-blue-600',
+    'docx': 'text-blue-600',
+    'toml': 'text-gray-400',
+    'ini': 'text-gray-400',
+    'env': 'text-yellow-600',
+    'sh': 'text-green-500',
+    'bash': 'text-green-500',
+    'zsh': 'text-green-500',
+    'gitignore': 'text-orange-500',
+    'gitattributes': 'text-orange-500',
+    'lock': 'text-gray-500',
+    'log': 'text-gray-400',
+    'htaccess': 'text-green-600',
+  };
+
+  const color = colorMap[ext] || 'text-gray-400';
+  return { icon: <FileText size={size} className={color} />, color };
+};
+
+// Legacy function for backward compatibility
+const getFileIconColor = (filename: string): string => {
+  return getFileIcon(filename).color;
+};
+
+// ============ Image Thumbnail Component for Grid View ============
+const ImageThumbnail = ({ path, name, fallbackIcon, isRemote = false }: { path: string; name: string; fallbackIcon: React.ReactNode; isRemote?: boolean }) => {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadImage = async () => {
+      try {
+        const command = isRemote ? 'ftp_read_file_base64' : 'read_file_base64';
+        const base64: string = await invoke(command, { path });
+        if (cancelled) return;
+        const ext = name.split('.').pop()?.toLowerCase() || '';
+        const mimeTypes: Record<string, string> = {
+          jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+          gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', bmp: 'image/bmp', ico: 'image/x-icon'
+        };
+        const mime = mimeTypes[ext] || 'image/png';
+        setSrc(`data:${mime};base64,${base64}`);
+      } catch {
+        if (!cancelled) setError(true);
+      }
+    };
+    loadImage();
+    return () => { cancelled = true; };
+  }, [path, name, isRemote]);
+
+  if (error || !src) {
+    return <div className="file-grid-icon">{fallbackIcon}</div>;
+  }
+  return <img src={src} alt={name} className="file-grid-thumbnail" />;
 };
 
 // ============ Types ============
@@ -315,6 +469,7 @@ const App: React.FC = () => {
   const [showSyncPanel, setShowSyncPanel] = useState(false);
   const [showMenuBar, setShowMenuBar] = useState(true);  // Internal header visibility
   const [systemMenuVisible, setSystemMenuVisible] = useState(true);  // Native system menu bar
+  const [compactMode, setCompactMode] = useState(false);  // Compact UI mode
   const [isSyncNavigation, setIsSyncNavigation] = useState(false); // Navigation Sync feature
   const [syncBasePaths, setSyncBasePaths] = useState<{ remote: string; local: string } | null>(null);
   const [syncNavDialog, setSyncNavDialog] = useState<{ missingPath: string; isRemote: boolean; targetPath: string } | null>(null);
@@ -334,6 +489,10 @@ const App: React.FC = () => {
   // DevTools Panel
   const [devToolsOpen, setDevToolsOpen] = useState(false);
   const [devToolsPreviewFile, setDevToolsPreviewFile] = useState<PreviewFile | null>(null);
+
+  // View Mode (list/grid)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const isImageFile = (name: string) => /\.(jpg|jpeg|png|gif|svg|webp|bmp|ico)$/i.test(name);
 
   // Load image preview as base64 when file changes
   useEffect(() => {
@@ -398,12 +557,37 @@ const App: React.FC = () => {
         }
       }
       invoke('toggle_menu_bar', { visible: showMenu });
-      // Update internal state to match (if we linked valid state)
-      // Actually showMenuBar state controls the INTERNAL header, showSystemMenu controls the Native one.
-      // They are independent.
+
+      // Load compact mode setting
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        if (typeof parsed.compactMode === 'boolean') {
+          setCompactMode(parsed.compactMode);
+        }
+      }
     } catch (e) {
       console.error("Failed to init menu", e);
     }
+
+    // Listen for settings changes from SettingsPanel
+    const handleSettingsChange = () => {
+      try {
+        const savedSettings = localStorage.getItem(SETTINGS_KEY);
+        if (savedSettings) {
+          const parsed = JSON.parse(savedSettings);
+          if (typeof parsed.compactMode === 'boolean') {
+            setCompactMode(parsed.compactMode);
+          }
+        }
+      } catch (e) { }
+    };
+    window.addEventListener('storage', handleSettingsChange);
+    // Also listen for custom event when settings saved from same tab
+    window.addEventListener('aeroftp-settings-changed', handleSettingsChange);
+    return () => {
+      window.removeEventListener('storage', handleSettingsChange);
+      window.removeEventListener('aeroftp-settings-changed', handleSettingsChange);
+    };
   }, []);
 
   const { theme, setTheme } = useTheme();
@@ -1000,6 +1184,15 @@ const App: React.FC = () => {
       { label: 'Rename', icon: <Pencil size={14} />, action: () => renameFile(file.path, file.name, true), disabled: count > 1 },
       { label: 'Permissions', icon: <Shield size={14} />, action: () => setPermissionsDialog({ file, visible: true }), disabled: count > 1 },
       { label: 'Delete', icon: <Trash2 size={14} />, action: () => deleteMultipleRemoteFiles(filesToUse), danger: true, divider: true },
+      { label: 'Copy Path', icon: <Copy size={14} />, action: () => { navigator.clipboard.writeText(file.path); toast.success('Path copied'); } },
+      { label: 'Copy Name', icon: <Clipboard size={14} />, action: () => { navigator.clipboard.writeText(file.name); toast.success('Name copied'); } },
+      {
+        label: 'Copy FTP URL', icon: <Link2 size={14} />, action: () => {
+          const url = `ftp://${connectionParams.username}@${connectionParams.server}${file.path}`;
+          navigator.clipboard.writeText(url);
+          toast.success('FTP URL copied');
+        }
+      },
     ];
     contextMenu.show(e, items);
   };
@@ -1028,6 +1221,9 @@ const App: React.FC = () => {
       { label: 'Preview', icon: <Eye size={14} />, action: () => openDevToolsPreview(file, false), disabled: count > 1 || file.is_dir || !isPreviewable(file.name) },
       { label: 'Rename', icon: <Pencil size={14} />, action: () => renameFile(file.path, file.name, false), disabled: count > 1 },
       { label: 'Delete', icon: <Trash2 size={14} />, action: () => deleteMultipleLocalFiles(filesToUpload), danger: true, divider: true },
+      { label: 'Copy Path', icon: <Copy size={14} />, action: () => { navigator.clipboard.writeText(file.path); toast.success('Path copied'); } },
+      { label: 'Copy Name', icon: <Clipboard size={14} />, action: () => { navigator.clipboard.writeText(file.name); toast.success('Name copied'); }, divider: true },
+      { label: 'Open in File Manager', icon: <ExternalLink size={14} />, action: () => openInFileManager(file.is_dir ? file.path : currentLocalPath) },
     ];
     contextMenu.show(e, items);
   };
@@ -1040,7 +1236,7 @@ const App: React.FC = () => {
   const openInFileManager = async (path: string) => { try { await invoke('open_in_file_manager', { path }); } catch { } };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 transition-colors duration-300 flex flex-col overflow-hidden">
+    <div className={`h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 transition-colors duration-300 flex flex-col overflow-hidden ${compactMode ? 'compact-mode' : ''}`}>
       {/* Native System Titlebar - CustomTitlebar removed for Linux compatibility */}
 
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
@@ -1235,6 +1431,14 @@ const App: React.FC = () => {
                     <FolderOpen size={16} /> Open
                   </button>
                 )}
+                {/* View Mode Toggle */}
+                <button
+                  onClick={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
+                  className="px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg text-sm flex items-center gap-1.5"
+                  title={viewMode === 'list' ? 'Switch to Grid View' : 'Switch to List View'}
+                >
+                  {viewMode === 'list' ? <LayoutGrid size={16} /> : <List size={16} />}
+                </button>
                 {isConnected && (
                   <>
                     <button onClick={() => uploadMultipleFiles()} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm flex items-center gap-1.5" title="Upload multiple files">
@@ -1296,32 +1500,82 @@ const App: React.FC = () => {
                   <Globe size={14} className={isSyncNavigation ? 'text-purple-500' : 'text-green-500'} /> {currentRemotePath}
                 </div>
                 <div className="flex-1 overflow-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                      <tr>
-                        <SortableHeader label="Name" field="name" currentField={remoteSortField} order={remoteSortOrder} onClick={handleRemoteSort} />
-                        <SortableHeader label="Size" field="size" currentField={remoteSortField} order={remoteSortOrder} onClick={handleRemoteSort} />
-                        <SortableHeader label="Modified" field="modified" currentField={remoteSortField} order={remoteSortOrder} onClick={handleRemoteSort} />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {/* Go Up Row */}
+                  {viewMode === 'list' ? (
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                        <tr>
+                          <SortableHeader label="Name" field="name" currentField={remoteSortField} order={remoteSortOrder} onClick={handleRemoteSort} />
+                          <SortableHeader label="Size" field="size" currentField={remoteSortField} order={remoteSortOrder} onClick={handleRemoteSort} />
+                          <SortableHeader label="Modified" field="modified" currentField={remoteSortField} order={remoteSortOrder} onClick={handleRemoteSort} />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                        {/* Go Up Row */}
+                        {currentRemotePath !== '/' && (
+                          <tr
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+                            onClick={() => changeRemoteDirectory('..')}
+                          >
+                            <td className="px-4 py-2 flex items-center gap-2 text-gray-500">
+                              <FolderUp size={16} />
+                              <span className="italic">Go up</span>
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-400">—</td>
+                            <td className="px-4 py-2 text-sm text-gray-400">—</td>
+                          </tr>
+                        )}
+                        {sortedRemoteFiles.map((file, i) => (
+                          <tr
+                            key={file.name}
+                            onClick={(e) => {
+                              if (file.name === '..') return;
+                              if (e.ctrlKey || e.metaKey) {
+                                setSelectedRemoteFiles(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(file.name)) next.delete(file.name);
+                                  else next.add(file.name);
+                                  return next;
+                                });
+                              } else {
+                                setSelectedRemoteFiles(new Set([file.name]));
+                              }
+                            }}
+                            onDoubleClick={() => handleRemoteFileAction(file)}
+                            onContextMenu={(e: React.MouseEvent) => showRemoteContextMenu(e, file)}
+                            className={`cursor-pointer transition-colors ${selectedRemoteFiles.has(file.name)
+                              ? 'bg-blue-100 dark:bg-blue-900/40'
+                              : 'hover:bg-blue-50 dark:hover:bg-gray-700'
+                              }`}
+                          >
+                            <td className="px-4 py-2 flex items-center gap-2">
+                              {file.is_dir ? <Folder size={16} className="text-yellow-500" /> : getFileIcon(file.name).icon}
+                              {file.name}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-500">{file.size ? formatBytes(file.size) : '-'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-500">{file.modified || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    /* Grid View */
+                    <div className="file-grid">
+                      {/* Go Up Item */}
                       {currentRemotePath !== '/' && (
-                        <tr
-                          className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+                        <div
+                          className="file-grid-item file-grid-go-up"
                           onClick={() => changeRemoteDirectory('..')}
                         >
-                          <td className="px-4 py-2 flex items-center gap-2 text-gray-500">
-                            <FolderUp size={16} />
-                            <span className="italic">Go up</span>
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-400">—</td>
-                          <td className="px-4 py-2 text-sm text-gray-400">—</td>
-                        </tr>
+                          <div className="file-grid-icon">
+                            <FolderUp size={32} className="text-gray-400" />
+                          </div>
+                          <span className="file-grid-name italic text-gray-500">Go up</span>
+                        </div>
                       )}
-                      {sortedRemoteFiles.map((file, i) => (
-                        <tr
+                      {sortedRemoteFiles.map((file) => (
+                        <div
                           key={file.name}
+                          className={`file-grid-item ${selectedRemoteFiles.has(file.name) ? 'selected' : ''}`}
                           onClick={(e) => {
                             if (file.name === '..') return;
                             if (e.ctrlKey || e.metaKey) {
@@ -1337,21 +1591,31 @@ const App: React.FC = () => {
                           }}
                           onDoubleClick={() => handleRemoteFileAction(file)}
                           onContextMenu={(e: React.MouseEvent) => showRemoteContextMenu(e, file)}
-                          className={`cursor-pointer transition-colors ${selectedRemoteFiles.has(file.name)
-                            ? 'bg-blue-100 dark:bg-blue-900/40'
-                            : 'hover:bg-blue-50 dark:hover:bg-gray-700'
-                            }`}
                         >
-                          <td className="px-4 py-2 flex items-center gap-2">
-                            {file.is_dir ? <Folder size={16} className="text-yellow-500" /> : <FileText size={16} className="text-gray-400" />}
-                            {file.name}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-500">{file.size ? formatBytes(file.size) : '-'}</td>
-                          <td className="px-4 py-2 text-sm text-gray-500">{file.modified || '-'}</td>
-                        </tr>
+                          {file.is_dir ? (
+                            <div className="file-grid-icon">
+                              <Folder size={32} className="text-yellow-500" />
+                            </div>
+                          ) : isImageFile(file.name) ? (
+                            <ImageThumbnail
+                              path={currentRemotePath === '/' ? `/${file.name}` : `${currentRemotePath}/${file.name}`}
+                              name={file.name}
+                              fallbackIcon={getFileIcon(file.name).icon}
+                              isRemote={true}
+                            />
+                          ) : (
+                            <div className="file-grid-icon">
+                              {getFileIcon(file.name).icon}
+                            </div>
+                          )}
+                          <span className="file-grid-name">{file.name}</span>
+                          {!file.is_dir && file.size && (
+                            <span className="file-grid-size">{formatBytes(file.size)}</span>
+                          )}
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1362,36 +1626,91 @@ const App: React.FC = () => {
                   <span className="truncate flex-1">{currentLocalPath}</span>
                 </div>
                 <div className="flex-1 overflow-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                      <tr>
-                        <SortableHeader label="Name" field="name" currentField={localSortField} order={localSortOrder} onClick={handleLocalSort} />
-                        <SortableHeader label="Size" field="size" currentField={localSortField} order={localSortOrder} onClick={handleLocalSort} />
-                        <SortableHeader label="Modified" field="modified" currentField={localSortField} order={localSortOrder} onClick={handleLocalSort} />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {/* Go Up Row */}
+                  {viewMode === 'list' ? (
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                        <tr>
+                          <SortableHeader label="Name" field="name" currentField={localSortField} order={localSortOrder} onClick={handleLocalSort} />
+                          <SortableHeader label="Size" field="size" currentField={localSortField} order={localSortOrder} onClick={handleLocalSort} />
+                          <SortableHeader label="Modified" field="modified" currentField={localSortField} order={localSortOrder} onClick={handleLocalSort} />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                        {/* Go Up Row */}
+                        {currentLocalPath !== '/' && (
+                          <tr
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+                            onClick={() => changeLocalDirectory(currentLocalPath.split('/').slice(0, -1).join('/') || '/')}
+                          >
+                            <td className="px-4 py-2 flex items-center gap-2 text-gray-500">
+                              <FolderUp size={16} />
+                              <span className="italic">Go up</span>
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-400">—</td>
+                            <td className="px-4 py-2 text-sm text-gray-400">—</td>
+                          </tr>
+                        )}
+                        {sortedLocalFiles.map((file, i) => (
+                          <tr
+                            key={file.name}
+                            onClick={(e) => {
+                              if (file.name === '..') return;
+                              if (e.ctrlKey || e.metaKey) {
+                                setSelectedLocalFiles(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(file.name)) next.delete(file.name);
+                                  else next.add(file.name);
+                                  return next;
+                                });
+                              } else {
+                                setSelectedLocalFiles(new Set([file.name]));
+                                setPreviewFile(file);
+                              }
+                            }}
+                            onDoubleClick={() => {
+                              if (file.is_dir) {
+                                changeLocalDirectory(file.path);
+                              } else {
+                                openInFileManager(file.path);
+                              }
+                            }}
+                            onContextMenu={(e: React.MouseEvent) => showLocalContextMenu(e, file)}
+                            className={`cursor-pointer transition-colors ${selectedLocalFiles.has(file.name)
+                              ? 'bg-blue-100 dark:bg-blue-900/40'
+                              : 'hover:bg-blue-50 dark:hover:bg-gray-700'
+                              }`}
+                          >
+                            <td className="px-4 py-2 flex items-center gap-2">
+                              {file.is_dir ? <Folder size={16} className="text-yellow-500" /> : getFileIcon(file.name).icon}
+                              {file.name}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-500">{file.size !== null ? formatBytes(file.size) : '-'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-500">{formatDate(file.modified)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    /* Grid View */
+                    <div className="file-grid">
+                      {/* Go Up Item */}
                       {currentLocalPath !== '/' && (
-                        <tr
-                          className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+                        <div
+                          className="file-grid-item file-grid-go-up"
                           onClick={() => changeLocalDirectory(currentLocalPath.split('/').slice(0, -1).join('/') || '/')}
                         >
-                          <td className="px-4 py-2 flex items-center gap-2 text-gray-500">
-                            <FolderUp size={16} />
-                            <span className="italic">Go up</span>
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-400">—</td>
-                          <td className="px-4 py-2 text-sm text-gray-400">—</td>
-                        </tr>
+                          <div className="file-grid-icon">
+                            <FolderUp size={32} className="text-gray-400" />
+                          </div>
+                          <span className="file-grid-name italic text-gray-500">Go up</span>
+                        </div>
                       )}
-                      {sortedLocalFiles.map((file, i) => (
-                        <tr
+                      {sortedLocalFiles.map((file) => (
+                        <div
                           key={file.name}
+                          className={`file-grid-item ${selectedLocalFiles.has(file.name) ? 'selected' : ''}`}
                           onClick={(e) => {
-                            // Prevent selection of '..' or if holding shift (range todo)
                             if (file.name === '..') return;
-
                             if (e.ctrlKey || e.metaKey) {
                               setSelectedLocalFiles(prev => {
                                 const next = new Set(prev);
@@ -1401,33 +1720,41 @@ const App: React.FC = () => {
                               });
                             } else {
                               setSelectedLocalFiles(new Set([file.name]));
-                              setPreviewFile(file); // Show in preview
+                              setPreviewFile(file);
                             }
                           }}
                           onDoubleClick={() => {
                             if (file.is_dir) {
-                              // Use absolute path provided by backend - failsafe
                               changeLocalDirectory(file.path);
                             } else {
                               openInFileManager(file.path);
                             }
                           }}
                           onContextMenu={(e: React.MouseEvent) => showLocalContextMenu(e, file)}
-                          className={`cursor-pointer transition-colors ${selectedLocalFiles.has(file.name)
-                            ? 'bg-blue-100 dark:bg-blue-900/40'
-                            : 'hover:bg-blue-50 dark:hover:bg-gray-700'
-                            }`}
                         >
-                          <td className="px-4 py-2 flex items-center gap-2">
-                            {file.is_dir ? <Folder size={16} className="text-yellow-500" /> : <FileText size={16} className="text-gray-400" />}
-                            {file.name}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-500">{file.size !== null ? formatBytes(file.size) : '-'}</td>
-                          <td className="px-4 py-2 text-sm text-gray-500">{file.modified || '-'}</td>
-                        </tr>
+                          {file.is_dir ? (
+                            <div className="file-grid-icon">
+                              <Folder size={32} className="text-yellow-500" />
+                            </div>
+                          ) : isImageFile(file.name) ? (
+                            <ImageThumbnail
+                              path={file.path}
+                              name={file.name}
+                              fallbackIcon={getFileIcon(file.name).icon}
+                            />
+                          ) : (
+                            <div className="file-grid-icon">
+                              {getFileIcon(file.name).icon}
+                            </div>
+                          )}
+                          <span className="file-grid-name">{file.name}</span>
+                          {!file.is_dir && file.size !== null && (
+                            <span className="file-grid-size">{formatBytes(file.size)}</span>
+                          )}
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  )}
                 </div>
               </div>
 

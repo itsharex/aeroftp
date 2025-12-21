@@ -30,7 +30,15 @@
     "fs:read-all",
     "fs:write-all",
     "log:default",
-    "core:path:default"
+    "core:path:default",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        {
+          "path": "**"
+        }
+      ]
+    }
   ],
   "remote": {
     "urls": [

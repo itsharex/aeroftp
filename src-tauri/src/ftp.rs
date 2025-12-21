@@ -273,6 +273,36 @@ impl FtpManager {
         Ok(())
     }
 
+    /// Download a file to memory (returns bytes directly)
+    pub async fn download_to_bytes(&mut self, remote_path: &str) -> Result<Vec<u8>> {
+        let stream = self.stream.as_mut()
+            .ok_or(FtpManagerError::NotConnected)?;
+        
+        info!("Downloading to memory: {}", remote_path);
+        
+        // Set binary transfer mode
+        stream.transfer_type(FileType::Binary)
+            .await
+            .map_err(|e| FtpManagerError::OperationFailed(e.to_string()))?;
+        
+        // Download using retr_as_stream
+        let mut data_stream = stream.retr_as_stream(remote_path)
+            .await
+            .map_err(|e| FtpManagerError::OperationFailed(e.to_string()))?;
+        
+        // Read all data
+        let mut buf = Vec::new();
+        data_stream.read_to_end(&mut buf).await?;
+        
+        // Finalize the stream
+        stream.finalize_retr_stream(data_stream)
+            .await
+            .map_err(|e| FtpManagerError::OperationFailed(e.to_string()))?;
+        
+        info!("Downloaded {} bytes from: {}", buf.len(), remote_path);
+        Ok(buf)
+    }
+
     /// Download a file with progress callback
     pub async fn download_file_with_progress<F>(
         &mut self, 
