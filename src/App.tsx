@@ -66,7 +66,7 @@ const getFileIcon = (filename: string, size: number = 16): { icon: React.ReactNo
   const ext = filename.split('.').pop()?.toLowerCase() || '';
 
   // Special icons for specific file types
-  const iconMap: Record<string, { Icon: React.FC<{ size?: number; className?: string }>; color: string }> = {
+  const iconMap: Record<string, { Icon: any; color: string }> = {
     // Archives
     'zip': { Icon: Archive, color: 'text-yellow-600' },
     'rar': { Icon: Archive, color: 'text-yellow-600' },
