@@ -1,0 +1,93 @@
+app-id: com.aeroftp.app
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: aeroftp
+
+finish-args:
+  # Network access for FTP connections
+  - --share=network
+  # Access to home directory
+  - --filesystem=home
+  # Access to removable media
+  - --filesystem=/media
+  - --filesystem=/run/media
+  # Wayland and X11 support
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # GPU acceleration
+  - --device=dri
+  # Audio (if needed for notifications)
+  - --socket=pulseaudio
+
+modules:
+  # Rust toolchain
+  - name: rust
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/bin
+      - mkdir -p /app/lib
+    sources:
+      - type: archive
+        url: https://static.rust-lang.org/dist/rust-1.75.0-x86_64-unknown-linux-gnu.tar.gz
+        sha256: 473978b6f8ff216389f9e89315211c6b683cf95a966196e7914b46e8cf0d74f6
+    cleanup:
+      - '*'
+
+  # Node.js for building frontend
+  - name: nodejs
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/bin /app/lib
+      - cp -r bin/* /app/bin/
+      - cp -r lib/* /app/lib/
+      - cp -r include /app/
+    sources:
+      - type: archive
+        url: https://nodejs.org/dist/v20.11.0/node-v20.11.0-linux-x64.tar.xz
+        sha256: 7e1004d80b0dd660de1605f857f7ffb0d6b17c0c43cb94516c5bc936384e2e7d
+
+  # WebKit2GTK for Tauri
+  - name: webkit2gtk-4.1
+    buildsystem: simple
+    build-commands:
+      - echo "WebKit2GTK will be provided by the runtime"
+
+  # AeroFTP application
+  - name: aeroftp
+    buildsystem: simple
+    build-commands:
+      # Install Rust
+      - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+      - source $HOME/.cargo/env
+      
+      # Install dependencies
+      - npm ci
+      
+      # Build the application
+      - npm run tauri build
+      
+      # Install binary
+      - install -Dm755 src-tauri/target/release/aeroftp /app/bin/aeroftp
+      
+      # Install icon
+      - install -Dm644 icons/AeroFTP_simbol_color_512x512.png /app/share/icons/hicolor/512x512/apps/com.aeroftp.app.png
+      
+      # Install desktop file
+      - install -Dm644 com.aeroftp.app.desktop /app/share/applications/com.aeroftp.app.desktop
+      
+      # Install AppStream metadata
+      - install -Dm644 com.aeroftp.app.metainfo.xml /app/share/metainfo/com.aeroftp.app.metainfo.xml
+    
+    sources:
+      - type: git
+        url: https://github.com/axpnet/aeroftp.git
+        tag: v0.5.6
+        commit: 7b24a5190d7582422a81c414a94cdd9e26238b1c
+      
+      - type: file
+        path: com.aeroftp.app.desktop
+      
+      - type: file
+        path: com.aeroftp.app.metainfo.xml

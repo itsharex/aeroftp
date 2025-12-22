@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.aeroftp.app</id>
+  
+  <name>AeroFTP</name>
+  <summary>Fast, Beautiful, Reliable FTP Client</summary>
+  
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  
+  <description>
+    <p>
+      AeroFTP is a modern FTP client built with Tauri that combines beauty and functionality.
+      It offers a sleek interface with powerful features for managing your FTP connections.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>🚀 Fast transfers with real-time progress monitoring</li>
+      <li>🎨 Beautiful, modern dark/light themes</li>
+      <li>📁 Dual-pane file browser for local and remote files</li>
+      <li>🔄 File synchronization with conflict detection</li>
+      <li>💻 Integrated DevTools with code editor, terminal, and AI chat</li>
+      <li>📜 Multi-session tabs with connection caching</li>
+      <li>🔐 Secure connection profiles management</li>
+      <li>⌨️ Keyboard shortcuts for power users</li>
+    </ul>
+    <p>
+      Built with Rust (Tauri) and React/TypeScript for maximum performance and reliability.
+    </p>
+  </description>
+  
+  <launchable type="desktop-id">com.aeroftp.app.desktop</launchable>
+  
+  <screenshots>
+    <screenshot type="default">
+      <caption>AeroFTP main window showing dual-pane file browser</caption>
+      <image>https://raw.githubusercontent.com/axpnet/aeroftp/main/docs/screenshots/main-window.png</image>
+    </screenshot>
+  </screenshots>
+  
+  <url type="homepage">https://github.com/axpnet/aeroftp</url>
+  <url type="bugtracker">https://github.com/axpnet/aeroftp/issues</url>
+  
+  <developer_name>axpdev</developer_name>
+  
+  <provides>
+    <binary>aeroftp</binary>
+  </provides>
+  
+  <releases>
+    <release version="0.5.6" date="2025-12-22">
+      <description>
+        <p>Bug fixes and improvements:</p>
+        <ul>
+          <li>Fixed TypeScript build errors in ToolApproval component</li>
+          <li>Improved cross-platform compatibility with PTY module on Windows</li>
+          <li>Added Snap package support for Ubuntu</li>
+          <li>Better Linux desktop integration</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.3.2" date="2025-12-21">
+      <description>
+        <p>Initial stable release with GitHub Actions workflow fixes</p>
+      </description>
+    </release>
+  </releases>
+  
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-info">mild</content_attribute>
+  </content_rating>
+</component>
