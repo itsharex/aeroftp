@@ -36,8 +36,12 @@ export {
 
 // Viewers (export individually as they're implemented)
 export { ImageViewer } from './viewers/ImageViewer';
-// export { AudioPlayer } from './viewers/AudioPlayer';
+export { AudioPlayer } from './viewers/AudioPlayer';
 // export { VideoPlayer } from './viewers/VideoPlayer';
 // export { PDFViewer } from './viewers/PDFViewer';
 // export { MarkdownViewer } from './viewers/MarkdownViewer';
 // export { TextViewer } from './viewers/TextViewer';
+
+// Audio controls
+export { AudioVisualizer } from './controls/AudioVisualizer';
+export { AudioMixer, EQ_BANDS, EQ_PRESETS } from './controls/AudioMixer';

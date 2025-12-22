@@ -17,8 +17,8 @@ import { X, Download, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-rea
 import { UniversalPreviewProps, PreviewFileData } from './types';
 import { getPreviewCategory, formatFileSize, getCategoryIcon } from './utils/fileTypes';
 import { ImageViewer } from './viewers/ImageViewer';
+import { AudioPlayer } from './viewers/AudioPlayer';
 // Future imports:
-// import { AudioPlayer } from './viewers/AudioPlayer';
 // import { VideoPlayer } from './viewers/VideoPlayer';
 // import { PDFViewer } from './viewers/PDFViewer';
 // import { MarkdownViewer } from './viewers/MarkdownViewer';
@@ -96,16 +96,7 @@ export const UniversalPreview: React.FC<UniversalPreviewProps> = ({
                 return <ImageViewer file={file} onError={handleViewerError} />;
 
             case 'audio':
-                // Placeholder until AudioPlayer is implemented
-                return (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                        <div className="text-center">
-                            <div className="text-6xl mb-4">🎵</div>
-                            <div className="text-lg">Audio Player</div>
-                            <div className="text-sm text-gray-500 mt-2">Coming soon...</div>
-                        </div>
-                    </div>
-                );
+                return <AudioPlayer file={file} onError={handleViewerError} />;
 
             case 'video':
                 // Placeholder until VideoPlayer is implemented
