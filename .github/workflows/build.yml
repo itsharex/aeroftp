@@ -109,7 +109,7 @@ jobs:
         run: npm run tauri build
 
       - name: Build Snap
-        run: snapcraft --use-lxd
+        run: snapcraft pack --destructive-mode
 
       - name: List generated files
         run: ls -la *.snap || echo "No snap files found"
