@@ -334,6 +334,20 @@ table::-webkit-scrollbar-thumb:hover {
   }
 }
 
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 4px rgba(168, 85, 247, 0.2);
+    transform: scaleY(1);
+  }
+
+  50% {
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
+    transform: scaleY(1.1);
+  }
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -420,15 +434,57 @@ thead {
 
 /* Table row transitions */
 tbody tr {
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 tbody tr:hover {
   transform: translateX(2px);
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+.dark tbody tr:hover {
+  background-color: #1e2130 !important;
 }
 
 tbody tr:active {
   transform: scale(0.995);
+}
+
+/* Selected row - gradient with neon border */
+tbody tr.selected,
+.file-row-selected {
+  background: linear-gradient(135deg, rgba(122, 162, 247, 0.2), rgba(187, 154, 247, 0.15)) !important;
+  box-shadow: inset 0 0 0 1px rgba(122, 162, 247, 0.5);
+}
+
+.dark tbody tr.selected,
+.dark .file-row-selected {
+  background: linear-gradient(135deg, rgba(122, 162, 247, 0.25), rgba(187, 154, 247, 0.2)) !important;
+  box-shadow: inset 0 0 0 1px rgba(122, 162, 247, 0.6);
+}
+
+/* Status bar progress indicator */
+.status-bar-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
+  background-size: 200% 100%;
+  animation: progress-gradient 2s ease-in-out infinite;
+  border-radius: 0 3px 0 0;
+}
+
+@keyframes progress-gradient {
+
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 /* Size and Modified columns - don't wrap */

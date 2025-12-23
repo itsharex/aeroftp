@@ -25,7 +25,17 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://*.googleapis.com; img-src 'self' asset: https://asset.localhost data: blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; font-src 'self' data: https://cdn.jsdelivr.net; worker-src 'self' blob:"
+      "csp": "default-src 'self'; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://*.googleapis.com; img-src 'self' asset: https://asset.localhost data: blob:; media-src 'self' asset: https://asset.localhost blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; font-src 'self' data: https://cdn.jsdelivr.net; worker-src 'self' blob:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$HOME/**",
+          "/var/**",
+          "/home/**",
+          "/tmp/**",
+          "/**"
+        ]
+      }
     }
   },
   "bundle": {

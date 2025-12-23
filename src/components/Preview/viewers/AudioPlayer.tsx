@@ -1,22 +1,20 @@
 /**
- * Audio Player Component
+ * Audio Player Component - AeroPlayer CYBER EDITION 🔥
  * 
  * Full-featured audio player with:
  * - HTML5 Audio + Web Audio API integration
  * - Playback controls (play/pause/seek/volume)
- * - Real-time waveform/spectrum visualizer
+ * - Real-time visualizer with 4 modes + Cyber Mode
  * - 10-band graphic equalizer
- * - Metadata display (title, artist, album art)
- * - Playback speed control
- * - Loop toggle
- * 
- * Uses Web Audio API for visualizer and EQ processing.
+ * - Keyboard shortcuts
+ * - Playback speed control & Loop toggle
  */
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
     Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
-    Repeat, Gauge, Activity, BarChart2
+    Repeat, Gauge, Activity, BarChart2, Circle, Waves, Zap, ChevronDown, Loader2,
+    Sparkles, Flame, Maximize2, Minimize2, Eye
 } from 'lucide-react';
 import { ViewerBaseProps, PlaybackState, EqualizerState, MediaMetadata } from '../types';
 import { formatDuration } from '../utils/fileTypes';
@@ -35,6 +33,18 @@ const defaultEQState: EqualizerState = {
     presetName: 'Flat',
 };
 
+// Visualizer mode options
+const VISUALIZER_MODES: { value: VisualizerMode; label: string; icon: React.ReactNode }[] = [
+    { value: 'bars', label: 'Bars', icon: <BarChart2 size={14} /> },
+    { value: 'waveform', label: 'Waveform', icon: <Activity size={14} /> },
+    { value: 'radial', label: 'Radial', icon: <Circle size={14} /> },
+    { value: 'spectrum', label: 'Spectrum', icon: <Waves size={14} /> },
+    { value: 'fractal', label: 'Fractal', icon: <Sparkles size={14} /> },
+    { value: 'vortex', label: 'Vortex', icon: <Zap size={14} /> },
+    { value: 'plasma', label: 'Plasma', icon: <Flame size={14} /> },
+    { value: 'kaleidoscope', label: 'Kaleidoscope', icon: <Eye size={14} /> },
+];
+
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     file,
     onError,
@@ -48,6 +58,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const filtersRef = useRef<BiquadFilterNode[]>([]);
     const gainNodeRef = useRef<GainNode | null>(null);
     const pannerRef = useRef<StereoPannerNode | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     // State
     const [playback, setPlayback] = useState<PlaybackState>({
@@ -63,8 +74,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const [eqState, setEQState] = useState<EqualizerState>(defaultEQState);
     const [metadata, setMetadata] = useState<MediaMetadata | null>(null);
     const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>('bars');
+    const [cyberMode, setCyberMode] = useState(false);
     const [showMixer, setShowMixer] = useState(false);
+    const [showVisualizerMenu, setShowVisualizerMenu] = useState(false);
     const [isAudioReady, setIsAudioReady] = useState(false);
+    const [isBuffering, setIsBuffering] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Audio source URL
     const audioSrc = file.blobUrl || file.content as string || '';
@@ -74,28 +89,22 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         if (audioContextRef.current || !audioRef.current) return;
 
         try {
-            // Create AudioContext
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
             audioContextRef.current = ctx;
 
-            // Create source from audio element
             const source = ctx.createMediaElementSource(audioRef.current);
             sourceRef.current = source;
 
-            // Create analyser for visualizer
             const analyser = ctx.createAnalyser();
             analyser.fftSize = 256;
             analyserRef.current = analyser;
 
-            // Create gain node for volume
             const gainNode = ctx.createGain();
             gainNodeRef.current = gainNode;
 
-            // Create stereo panner for balance
             const panner = ctx.createStereoPanner();
             pannerRef.current = panner;
 
-            // Create EQ filters (10 bands)
             const filters = EQ_BANDS.map((band) => {
                 const filter = ctx.createBiquadFilter();
                 filter.type = 'peaking';
@@ -125,7 +134,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     // Update EQ filters when state changes
     useEffect(() => {
         if (!filtersRef.current.length) return;
-
         filtersRef.current.forEach((filter, index) => {
             filter.gain.value = eqState.enabled ? eqState.bands[index] : 0;
         });
@@ -153,8 +161,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 duration: audioRef.current!.duration,
             }));
             setIsAudioReady(true);
-
-            // Extract metadata from file name (basic)
+            setIsBuffering(false);
             setMetadata({
                 title: file.name.replace(/\.[^/.]+$/, ''),
             });
@@ -198,23 +205,28 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const togglePlay = useCallback(async () => {
         if (!audioRef.current) return;
 
-        // Initialize audio context on first play (required by browser policy)
+        // Initialize audio context on first play (required for Web Audio API)
         if (!audioContextRef.current) {
             initAudioContext();
         }
 
-        // Resume audio context if suspended
+        // Resume suspended audio context (browser autoplay policy)
         if (audioContextRef.current?.state === 'suspended') {
             await audioContextRef.current.resume();
         }
 
-        if (playback.isPlaying) {
-            audioRef.current.pause();
+        // Use actual audio element state, not our playback state
+        if (audioRef.current.paused) {
+            try {
+                await audioRef.current.play();
+            } catch (err) {
+                console.error('Failed to play audio:', err);
+            }
         } else {
-            await audioRef.current.play();
+            audioRef.current.pause();
         }
-        setPlayback(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
-    }, [playback.isPlaying, initAudioContext]);
+        // Note: isPlaying state is updated by onPlay/onPause handlers
+    }, [initAudioContext]);
 
     const seek = useCallback((time: number) => {
         if (audioRef.current) {
@@ -249,12 +261,72 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }, []);
 
     const skipBackward = useCallback(() => {
-        seek(Math.max(0, playback.currentTime - 10));
+        seek(Math.max(0, playback.currentTime - 5));
     }, [playback.currentTime, seek]);
 
     const skipForward = useCallback(() => {
-        seek(Math.min(playback.duration, playback.currentTime + 10));
+        seek(Math.min(playback.duration, playback.currentTime + 5));
     }, [playback.currentTime, playback.duration, seek]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only handle if this player is focused
+            if (!containerRef.current?.contains(document.activeElement) &&
+                document.activeElement !== document.body) {
+                return;
+            }
+
+            switch (e.key.toLowerCase()) {
+                case ' ':
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'arrowleft':
+                    e.preventDefault();
+                    skipBackward();
+                    break;
+                case 'arrowright':
+                    e.preventDefault();
+                    skipForward();
+                    break;
+                case 'arrowup':
+                    e.preventDefault();
+                    setVolume(Math.min(1, playback.volume + 0.1));
+                    break;
+                case 'arrowdown':
+                    e.preventDefault();
+                    setVolume(Math.max(0, playback.volume - 0.1));
+                    break;
+                case 'e':
+                    e.preventDefault();
+                    setShowMixer(prev => !prev);
+                    break;
+                case 'm':
+                    e.preventDefault();
+                    toggleMute();
+                    break;
+                case 'l':
+                    e.preventDefault();
+                    toggleLoop();
+                    break;
+                case 'c':
+                    e.preventDefault();
+                    setCyberMode(prev => !prev);
+                    break;
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [togglePlay, skipBackward, skipForward, setVolume, playback.volume, toggleMute, toggleLoop]);
+
+    // Mouse wheel volume control
+    const handleWheel = useCallback((e: React.WheelEvent) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.02 : 0.02;
+        setVolume(Math.max(0, Math.min(1, playback.volume + delta)));
+    }, [playback.volume, setVolume]);
 
     // Render loading state
     if (!audioSrc) {
@@ -266,7 +338,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }
 
     return (
-        <div className={`flex flex-col h-full bg-gray-900 ${className}`}>
+        <div
+            ref={containerRef}
+            className={`relative flex flex-col h-full bg-gray-900 ${className}`}
+            tabIndex={0}
+            onWheel={handleWheel}
+        >
             {/* Hidden audio element */}
             <audio
                 ref={audioRef}
@@ -276,43 +353,101 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 onEnded={handleEnded}
                 onProgress={handleProgress}
                 onError={handleError}
-                crossOrigin="anonymous"
+                onPlay={() => setPlayback(prev => ({ ...prev, isPlaying: true }))}
+                onPause={() => setPlayback(prev => ({ ...prev, isPlaying: false }))}
             />
 
-            {/* Visualizer area */}
-            <div className="flex-1 flex items-center justify-center p-6">
-                <div className="w-full max-w-2xl h-48 relative">
+            {/* Visualizer area - expands in fullscreen mode */}
+            <div className={`flex-1 flex items-center justify-center ${isFullscreen ? 'p-0' : 'p-6'}`}>
+                <div className={`w-full ${isFullscreen ? 'h-full' : 'max-w-4xl h-72'} relative`}>
                     {/* Visualizer */}
                     <AudioVisualizer
                         analyser={analyserRef.current}
                         mode={visualizerMode}
                         isPlaying={playback.isPlaying}
-                        className="rounded-xl"
+                        cyberMode={cyberMode}
+                        className={isFullscreen ? '' : 'rounded-xl'}
                     />
 
-                    {/* Visualizer mode toggle */}
-                    <button
-                        onClick={() => setVisualizerMode(m => m === 'bars' ? 'waveform' : 'bars')}
-                        className="absolute top-2 right-2 p-2 bg-gray-800/80 hover:bg-gray-700 rounded-lg transition-colors"
-                        title={visualizerMode === 'bars' ? 'Switch to Waveform' : 'Switch to Bars'}
-                    >
-                        {visualizerMode === 'bars' ? (
-                            <Activity size={16} className="text-cyan-400" />
-                        ) : (
-                            <BarChart2 size={16} className="text-purple-400" />
-                        )}
-                    </button>
+                    {/* Top controls overlay */}
+                    <div className="absolute top-2 right-2 flex items-center gap-2">
+                        {/* Fullscreen toggle */}
+                        <button
+                            onClick={() => {
+                                const container = containerRef.current;
+                                if (!container) return;
+                                if (!document.fullscreenElement) {
+                                    container.requestFullscreen();
+                                    setIsFullscreen(true);
+                                } else {
+                                    document.exitFullscreen();
+                                    setIsFullscreen(false);
+                                }
+                            }}
+                            className="p-1.5 rounded bg-black/40 hover:bg-black/60 text-white/70 hover:text-white transition-colors"
+                            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen VJ Mode'}
+                        >
+                            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                        </button>
+                        {/* Cyber Mode toggle */}
+                        <button
+                            onClick={() => setCyberMode(prev => !prev)}
+                            className={`p-2 rounded-lg transition-all ${cyberMode
+                                ? 'bg-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-500/20'
+                                : 'bg-gray-800/80 hover:bg-gray-700 text-gray-400'
+                                }`}
+                            title="Toggle Cyber Mode (C)"
+                        >
+                            <Zap size={16} className={cyberMode ? 'animate-pulse' : ''} />
+                        </button>
 
-                    {/* Album art placeholder / branding */}
-                    <div className="absolute bottom-2 right-2 text-xs text-gray-600 font-mono opacity-50">
-                        AeroPlayer
+                        {/* Visualizer mode dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowVisualizerMenu(prev => !prev)}
+                                className="flex items-center gap-1 px-2 py-1.5 bg-gray-800/80 hover:bg-gray-700 rounded-lg transition-colors"
+                                title="Change visualizer mode"
+                            >
+                                {VISUALIZER_MODES.find(m => m.value === visualizerMode)?.icon}
+                                <ChevronDown size={12} className="text-gray-400" />
+                            </button>
+
+                            {showVisualizerMenu && (
+                                <div className="absolute top-full right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 z-10">
+                                    {VISUALIZER_MODES.map((mode) => (
+                                        <button
+                                            key={mode.value}
+                                            onClick={() => {
+                                                setVisualizerMode(mode.value);
+                                                setShowVisualizerMenu(false);
+                                            }}
+                                            className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-gray-700 transition-colors ${visualizerMode === mode.value ? 'text-cyan-400' : 'text-white'
+                                                }`}
+                                        >
+                                            {mode.icon}
+                                            {mode.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* AeroPlayer branding */}
+                    <div className={`absolute bottom-2 right-2 text-xs font-mono transition-all ${cyberMode ? 'text-cyan-400/70 animate-pulse' : 'text-gray-600 opacity-50'
+                        }`}>
+                        AeroPlayer{cyberMode ? ' // CYBER' : ''}
                     </div>
                 </div>
             </div>
 
             {/* Track info */}
             <div className="text-center px-4 py-2">
-                <h3 className="text-lg font-medium text-white truncate">
+                <h3
+                    className={`text-lg font-medium truncate transition-all ${cyberMode ? 'text-cyan-300' : 'text-white'} ${playback.isPlaying ? 'drop-shadow-[0_0_8px_rgba(147,197,253,0.5)]' : ''
+                        }`}
+                    style={playback.isPlaying ? { textShadow: '0 0 10px rgba(147, 197, 253, 0.6)' } : {}}
+                >
                     {metadata?.title || file.name}
                 </h3>
                 {metadata?.artist && (
@@ -325,7 +460,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
             {/* Progress bar */}
             <div className="px-6 py-2">
-                <div className="relative h-1.5 bg-gray-700 rounded-full cursor-pointer group"
+                <div
+                    className={`relative bg-gray-700 rounded-full cursor-pointer group transition-all ${playback.isPlaying ? 'h-2 shadow-lg shadow-purple-500/20' : 'h-1.5'
+                        }`}
+                    style={playback.isPlaying ? {
+                        animation: 'pulse-glow 2s ease-in-out infinite',
+                    } : {}}
                     onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
                         const percent = (e.clientX - rect.left) / rect.width;
@@ -339,13 +479,16 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                     />
                     {/* Progress */}
                     <div
-                        className="absolute h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                        className={`absolute h-full rounded-full transition-all ${cyberMode
+                            ? 'bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500'
+                            : 'bg-gradient-to-r from-blue-500 to-purple-500'
+                            } ${playback.isPlaying ? 'shadow-md shadow-purple-500/40' : ''}`}
                         style={{ width: `${(playback.currentTime / playback.duration) * 100}%` }}
                     />
                     {/* Thumb */}
                     <div
-                        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                        style={{ left: `calc(${(playback.currentTime / playback.duration) * 100}% - 6px)` }}
+                        className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all ${cyberMode ? 'bg-cyan-400 shadow-cyan-400/50' : 'bg-white shadow-white/30'}`}
+                        style={{ left: `calc(${(playback.currentTime / playback.duration) * 100}% - 8px)` }}
                     />
                 </div>
                 <div className="flex justify-between mt-1 text-xs text-gray-500 font-mono">
@@ -360,7 +503,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 <button
                     onClick={skipBackward}
                     className="p-2 hover:bg-gray-800 rounded-full transition-colors"
-                    title="Skip -10s"
+                    title="Skip -5s (←)"
                 >
                     <SkipBack size={20} className="text-gray-400" />
                 </button>
@@ -368,10 +511,15 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 {/* Play/Pause */}
                 <button
                     onClick={togglePlay}
-                    disabled={!isAudioReady}
-                    className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500 rounded-full shadow-lg transition-all disabled:opacity-50"
+                    disabled={isBuffering}
+                    className={`p-4 rounded-full shadow-lg transition-all disabled:opacity-70 ${cyberMode
+                        ? 'bg-gradient-to-br from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 shadow-cyan-500/30'
+                        : 'bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500'
+                        }`}
                 >
-                    {playback.isPlaying ? (
+                    {isBuffering ? (
+                        <Loader2 size={24} className="text-white animate-spin" />
+                    ) : playback.isPlaying ? (
                         <Pause size={24} className="text-white" />
                     ) : (
                         <Play size={24} className="text-white ml-0.5" />
@@ -382,7 +530,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 <button
                     onClick={skipForward}
                     className="p-2 hover:bg-gray-800 rounded-full transition-colors"
-                    title="Skip +10s"
+                    title="Skip +5s (→)"
                 >
                     <SkipForward size={20} className="text-gray-400" />
                 </button>
@@ -395,6 +543,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                     <button
                         onClick={toggleMute}
                         className="p-1 hover:bg-gray-800 rounded transition-colors"
+                        title="Mute (M)"
                     >
                         {playback.isMuted || playback.volume === 0 ? (
                             <VolumeX size={18} className="text-gray-500" />
@@ -418,9 +567,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                     {/* Loop */}
                     <button
                         onClick={toggleLoop}
-                        className={`p-2 rounded-lg transition-colors ${playback.isLooping ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800'
+                        className={`p-2 rounded-lg transition-colors ${playback.isLooping
+                            ? (cyberMode ? 'bg-cyan-600 text-white' : 'bg-blue-600 text-white')
+                            : 'text-gray-400 hover:bg-gray-800'
                             }`}
-                        title="Toggle Loop"
+                        title="Toggle Loop (L)"
                     >
                         <Repeat size={16} />
                     </button>
@@ -445,18 +596,20 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
                 {/* Mixer toggle */}
                 <div className="w-36 flex justify-end">
-                    <AudioMixer
-                        state={eqState}
-                        onStateChange={setEQState}
-                        isExpanded={showMixer}
-                        onToggleExpand={() => setShowMixer(!showMixer)}
-                    />
+                    {!showMixer && (
+                        <AudioMixer
+                            state={eqState}
+                            onStateChange={setEQState}
+                            isExpanded={false}
+                            onToggleExpand={() => setShowMixer(true)}
+                        />
+                    )}
                 </div>
             </div>
 
-            {/* Expanded mixer panel */}
+            {/* Expanded mixer panel - overlay style */}
             {showMixer && (
-                <div className="px-6 pb-4">
+                <div className="absolute bottom-0 right-0 z-20 w-80 m-2">
                     <AudioMixer
                         state={eqState}
                         onStateChange={setEQState}
@@ -465,6 +618,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                     />
                 </div>
             )}
+
+            {/* Keyboard shortcuts hint */}
+            <div className="text-center text-xs text-gray-600 pb-2">
+                Space: Play/Pause • ←→: Skip • ↑↓: Volume • E: EQ • C: Cyber Mode
+            </div>
         </div>
     );
 };

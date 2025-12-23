@@ -28,145 +28,14 @@ import {
   Sun, Moon, Monitor, FolderUp, RefreshCw, FolderPlus, FolderOpen,
   Download, Upload, Pencil, Trash2, X, ArrowUp, ArrowDown,
   Folder, FileText, Globe, HardDrive, Settings, Search, Eye, Link2, Unlink, PanelTop, Shield, Cloud,
-  Archive, Image, Video, FileCode, Music, File, FileSpreadsheet, FileType, Code, Database,
-  Copy, Clipboard, ExternalLink, List, LayoutGrid
+  Archive, Image, Video, FileCode, Music, File, FileSpreadsheet, FileType, Code, Database, Clock,
+  Copy, Clipboard, ExternalLink, List, LayoutGrid, ChevronRight, Plus
 } from 'lucide-react';
 
-// ============ Utility Functions ============
-const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-};
-
-const formatSpeed = (bps: number): string => formatBytes(bps) + '/s';
-
-const formatETA = (seconds: number): string => {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
-};
-
-// Format date string from "2025-12-17 00:36" to "Dec 17 00:36" to match remote format
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '-';
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/);
-  if (match) {
-    const month = months[parseInt(match[2], 10) - 1];
-    const day = parseInt(match[3], 10);
-    return `${month} ${day} ${match[4]}`;
-  }
-  return dateStr;
-};
-
-// Get file icon and color based on extension
-const getFileIcon = (filename: string, size: number = 16): { icon: React.ReactNode; color: string } => {
-  const ext = filename.split('.').pop()?.toLowerCase() || '';
-
-  // Special icons for specific file types
-  const iconMap: Record<string, { Icon: any; color: string }> = {
-    // Archives
-    'zip': { Icon: Archive, color: 'text-yellow-600' },
-    'rar': { Icon: Archive, color: 'text-yellow-600' },
-    'tar': { Icon: Archive, color: 'text-yellow-600' },
-    'gz': { Icon: Archive, color: 'text-yellow-600' },
-    '7z': { Icon: Archive, color: 'text-yellow-600' },
-    // Images
-    'jpg': { Icon: Image, color: 'text-pink-400' },
-    'jpeg': { Icon: Image, color: 'text-pink-400' },
-    'png': { Icon: Image, color: 'text-pink-400' },
-    'gif': { Icon: Image, color: 'text-pink-400' },
-    'svg': { Icon: Image, color: 'text-orange-400' },
-    'webp': { Icon: Image, color: 'text-pink-400' },
-    'ico': { Icon: Image, color: 'text-pink-300' },
-    'bmp': { Icon: Image, color: 'text-pink-400' },
-    // Video
-    'mp4': { Icon: Video, color: 'text-purple-400' },
-    'webm': { Icon: Video, color: 'text-purple-400' },
-    'avi': { Icon: Video, color: 'text-purple-400' },
-    'mkv': { Icon: Video, color: 'text-purple-400' },
-    'mov': { Icon: Video, color: 'text-purple-400' },
-    // Audio
-    'mp3': { Icon: Music, color: 'text-green-400' },
-    'wav': { Icon: Music, color: 'text-green-400' },
-    'flac': { Icon: Music, color: 'text-green-400' },
-    'ogg': { Icon: Music, color: 'text-green-400' },
-    // Code files with FileCode icon
-    'php': { Icon: FileCode, color: 'text-purple-500' },
-    'js': { Icon: FileCode, color: 'text-yellow-400' },
-    'jsx': { Icon: FileCode, color: 'text-yellow-400' },
-    'ts': { Icon: FileCode, color: 'text-blue-500' },
-    'tsx': { Icon: FileCode, color: 'text-blue-500' },
-    'py': { Icon: FileCode, color: 'text-yellow-400' },
-    'rb': { Icon: FileCode, color: 'text-red-500' },
-    'go': { Icon: FileCode, color: 'text-cyan-400' },
-    'rs': { Icon: FileCode, color: 'text-orange-600' },
-    'java': { Icon: FileCode, color: 'text-red-400' },
-    'c': { Icon: FileCode, color: 'text-blue-400' },
-    'cpp': { Icon: FileCode, color: 'text-blue-500' },
-    'h': { Icon: FileCode, color: 'text-purple-400' },
-    'cs': { Icon: FileCode, color: 'text-green-500' },
-    'swift': { Icon: FileCode, color: 'text-orange-500' },
-    'kt': { Icon: FileCode, color: 'text-purple-500' },
-    'vue': { Icon: FileCode, color: 'text-green-500' },
-    'svelte': { Icon: FileCode, color: 'text-orange-600' },
-    // CSS/Style
-    'css': { Icon: Code, color: 'text-blue-400' },
-    'scss': { Icon: Code, color: 'text-pink-400' },
-    'sass': { Icon: Code, color: 'text-pink-400' },
-    'less': { Icon: Code, color: 'text-blue-300' },
-    // HTML
-    'html': { Icon: Globe, color: 'text-orange-500' },
-    'htm': { Icon: Globe, color: 'text-orange-500' },
-    // Data
-    'json': { Icon: FileType, color: 'text-yellow-500' },
-    'xml': { Icon: FileType, color: 'text-orange-400' },
-    'yaml': { Icon: FileType, color: 'text-red-400' },
-    'yml': { Icon: FileType, color: 'text-red-400' },
-    'sql': { Icon: Database, color: 'text-cyan-500' },
-    // Spreadsheets
-    'xls': { Icon: FileSpreadsheet, color: 'text-green-600' },
-    'xlsx': { Icon: FileSpreadsheet, color: 'text-green-600' },
-    'csv': { Icon: FileSpreadsheet, color: 'text-green-500' },
-  };
-
-  const entry = iconMap[ext];
-  if (entry) {
-    const { Icon, color } = entry;
-    return { icon: <Icon size={size} className={color} />, color };
-  }
-
-  // Fallback color map for other file types
-  const colorMap: Record<string, string> = {
-    'md': 'text-blue-300',
-    'txt': 'text-gray-400',
-    'pdf': 'text-red-500',
-    'doc': 'text-blue-600',
-    'docx': 'text-blue-600',
-    'toml': 'text-gray-400',
-    'ini': 'text-gray-400',
-    'env': 'text-yellow-600',
-    'sh': 'text-green-500',
-    'bash': 'text-green-500',
-    'zsh': 'text-green-500',
-    'gitignore': 'text-orange-500',
-    'gitattributes': 'text-orange-500',
-    'lock': 'text-gray-500',
-    'log': 'text-gray-400',
-    'htaccess': 'text-green-600',
-  };
-
-  const color = colorMap[ext] || 'text-gray-400';
-  return { icon: <FileText size={size} className={color} />, color };
-};
-
-// Legacy function for backward compatibility
-const getFileIconColor = (filename: string): string => {
-  return getFileIcon(filename).color;
-};
+// Extracted utilities and components (Phase 1 modularization)
+import { formatBytes, formatSpeed, formatETA, formatDate, getFileIcon, getFileIconColor } from './utils';
+import { ConfirmDialog, InputDialog, SyncNavDialog } from './components/Dialogs';
+import { TransferProgressBar, AnimatedBytes } from './components/Transfer';
 
 // ============ Image Thumbnail Component for Grid View ============
 const ImageThumbnail = ({ path, name, fallbackIcon, isRemote = false }: { path: string; name: string; fallbackIcon: React.ReactNode; isRemote?: boolean }) => {
@@ -254,86 +123,6 @@ const ThemeToggle = ({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) =
   );
 };
 
-// ============ Animated Bytes (Matrix-style for uploads) ============
-const AnimatedBytes = ({ bytes, isAnimated }: { bytes: number; isAnimated: boolean }) => {
-  const [displayText, setDisplayText] = useState(formatBytes(bytes));
-
-  useEffect(() => {
-    if (!isAnimated) {
-      setDisplayText(formatBytes(bytes));
-      return;
-    }
-
-    const chars = '0123456789ABCDEF';
-    let frame = 0;
-    const targetText = formatBytes(bytes);
-
-    const interval = setInterval(() => {
-      frame++;
-      // Create glitchy effect by replacing some chars with random ones
-      const glitched = targetText.split('').map((char, i) => {
-        if (char === ' ' || char === '.' || char === '/') return char;
-        // More glitch at start, stabilize over time
-        if (frame < 3 || (Math.random() > 0.7 && frame < 8)) {
-          return chars[Math.floor(Math.random() * chars.length)];
-        }
-        return char;
-      }).join('');
-      setDisplayText(glitched);
-
-      if (frame > 10) {
-        setDisplayText(targetText);
-      }
-    }, 80);
-
-    return () => clearInterval(interval);
-  }, [bytes, isAnimated]);
-
-  return <span className={isAnimated ? 'font-mono text-green-400' : ''}>{displayText}</span>;
-};
-
-// ============ Progress Bar (Apple-style) ============
-const TransferProgressBar = ({ transfer, onCancel }: { transfer: TransferProgress; onCancel: () => void }) => {
-  const isUpload = transfer.direction === 'upload';
-  const isIndeterminate = isUpload && transfer.percentage < 5;
-
-  return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-40 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-4 min-w-96">
-      <div className="flex items-center gap-4">
-        <div className={`text-2xl ${isUpload ? 'animate-pulse' : ''}`}>
-          {transfer.direction === 'download' ? <Download size={24} className="text-blue-500" /> : <Upload size={24} className="text-green-500" />}
-        </div>
-        <div className="flex-1">
-          <div className="flex justify-between items-center mb-2">
-            <span className="font-medium text-gray-900 dark:text-gray-100 truncate max-w-48">{transfer.filename}</span>
-            <span className="text-sm text-gray-500 dark:text-gray-400">{isIndeterminate ? '∞' : `${transfer.percentage}%`}</span>
-          </div>
-          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            {isIndeterminate ? (
-              <div className="h-full w-1/3 bg-gradient-to-r from-green-500 to-emerald-400 rounded-full"
-                style={{ animation: 'indeterminate 1.5s ease-in-out infinite' }} />
-            ) : (
-              <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300"
-                style={{ width: `${Math.max(transfer.percentage, 2)}%` }} />
-            )}
-          </div>
-          <div className="flex justify-between mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            <span>
-              <AnimatedBytes bytes={transfer.transferred} isAnimated={isIndeterminate} />
-              {' / '}
-              {formatBytes(transfer.total)}
-            </span>
-            <span>{isIndeterminate ? '⚡ Streaming...' : (transfer.speed_bps > 0 ? `${formatSpeed(transfer.speed_bps)} • ETA ${formatETA(transfer.eta_seconds)}` : 'Transferring...')}</span>
-          </div>
-        </div>
-        <button onClick={onCancel} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors">
-          <X size={18} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
 // ============ Sortable Header ============
 const SortableHeader = ({ label, field, currentField, order, onClick, className = '' }: {
   label: string; field: SortField; currentField: SortField; order: SortOrder; onClick: (f: SortField) => void; className?: string;
@@ -350,88 +139,6 @@ const SortableHeader = ({ label, field, currentField, order, onClick, className 
     </div>
   </th>
 );
-
-// ============ Confirm Dialog ============
-const ConfirmDialog = ({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) => (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl max-w-sm">
-      <p className="text-gray-900 dark:text-gray-100 mb-4">{message}</p>
-      <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Cancel</button>
-        <button onClick={onConfirm} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Delete</button>
-      </div>
-    </div>
-  </div>
-);
-
-// ============ Sync Navigation Choice Dialog ============
-interface SyncNavDialogProps {
-  missingPath: string;
-  isRemote: boolean;
-  onCreateFolder: () => void;
-  onDisableSync: () => void;
-  onCancel: () => void;
-}
-
-const SyncNavDialog = ({ missingPath, isRemote, onCreateFolder, onDisableSync, onCancel }: SyncNavDialogProps) => (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl max-w-md">
-      <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
-        📁 Folder Not Found
-      </h3>
-      <p className="text-gray-600 dark:text-gray-400 mb-2 text-sm">
-        The {isRemote ? 'remote' : 'local'} folder does not exist:
-      </p>
-      <p className="text-blue-500 font-mono text-sm bg-gray-100 dark:bg-gray-700 p-2 rounded mb-4 break-all">
-        {missingPath}
-      </p>
-      <div className="flex flex-col gap-2">
-        <button
-          onClick={onCreateFolder}
-          className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-left flex items-center gap-2"
-        >
-          <span>📂</span> Create folder and continue sync
-        </button>
-        <button
-          onClick={onDisableSync}
-          className="w-full px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-left flex items-center gap-2"
-        >
-          <span>🔗</span> Disable navigation sync
-        </button>
-        <button
-          onClick={onCancel}
-          className="w-full px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-left"
-        >
-          Cancel navigation
-        </button>
-      </div>
-    </div>
-  </div>
-);
-
-// ============ Input Dialog ============
-const InputDialog = ({ title, defaultValue, onConfirm, onCancel }: { title: string; defaultValue: string; onConfirm: (value: string) => void; onCancel: () => void }) => {
-  const [value, setValue] = useState(defaultValue);
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl w-96">
-        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">{title}</h3>
-        <input
-          type="text"
-          value={value}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
-          className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mb-4 text-gray-900 dark:text-gray-100"
-          autoFocus
-          onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && onConfirm(value)}
-        />
-        <div className="flex justify-end gap-2">
-          <button onClick={onCancel} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Cancel</button>
-          <button onClick={() => onConfirm(value)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">OK</button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ============ Main App ============
 const App: React.FC = () => {
@@ -452,6 +159,8 @@ const App: React.FC = () => {
   const [quickConnectDirs, setQuickConnectDirs] = useState({ remoteDir: '', localDir: '' });
   const [loading, setLoading] = useState(false);
   const [activeTransfer, setActiveTransfer] = useState<TransferProgress | null>(null);
+  const [isReconnecting, setIsReconnecting] = useState(false);  // FTP reconnection in progress
+  const hasActivity = activeTransfer !== null;  // Track if upload/download in progress
   const [activePanel, setActivePanel] = useState<'remote' | 'local'>('remote');
   const [remoteSortField, setRemoteSortField] = useState<SortField>('name');
   const [remoteSortOrder, setRemoteSortOrder] = useState<SortOrder>('asc');
@@ -468,6 +177,7 @@ const App: React.FC = () => {
   const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [showSyncPanel, setShowSyncPanel] = useState(false);
+  const [showConnectionScreen, setShowConnectionScreen] = useState(true);  // Initial connection screen, can be skipped
   const [showMenuBar, setShowMenuBar] = useState(true);  // Internal header visibility
   const [systemMenuVisible, setSystemMenuVisible] = useState(true);  // Native system menu bar
   const [compactMode, setCompactMode] = useState(false);  // Compact UI mode
@@ -528,6 +238,42 @@ const App: React.FC = () => {
     };
     loadPreview();
   }, [previewFile]);
+
+  // FTP Keep-Alive: Send NOOP every 60 seconds to prevent connection timeout
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const KEEP_ALIVE_INTERVAL = 60000; // 60 seconds
+
+    const keepAliveInterval = setInterval(async () => {
+      try {
+        await invoke('ftp_noop');
+      } catch (error) {
+        console.warn('Keep-alive NOOP failed, attempting reconnect...', error);
+
+        // Connection lost - attempt auto-reconnect
+        setIsReconnecting(true);
+        toast.info('Reconnecting...', 'Connection lost, attempting to reconnect');
+
+        try {
+          await invoke('reconnect_ftp');
+          toast.success('Reconnected', 'FTP connection restored');
+          // Refresh file list after reconnection
+          const response = await invoke<{ files: RemoteFile[]; current_path: string }>('list_files');
+          setRemoteFiles(response.files);
+          setCurrentRemotePath(response.current_path);
+        } catch (reconnectError) {
+          console.error('Auto-reconnect failed:', reconnectError);
+          toast.error('Connection Lost', 'Could not reconnect. Please reconnect manually.');
+          setIsConnected(false);
+        } finally {
+          setIsReconnecting(false);
+        }
+      }
+    }, KEEP_ALIVE_INTERVAL);
+
+    return () => clearInterval(keepAliveInterval);
+  }, [isConnected]);
 
   // Filtered files (search filter applied)
   const filteredLocalFiles = localFiles.filter(f =>
@@ -1006,34 +752,50 @@ const App: React.FC = () => {
     try {
       const filePath = isRemote ? (file as RemoteFile).path : (file as LocalFile).path;
       let blobUrl: string | undefined;
-      let content: string | undefined;
 
-      // For images, load as base64 and create blob URL
       const category = getPreviewCategory(file.name);
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
 
-      if (category === 'image') {
-        if (isRemote) {
-          // Remote image: download as base64
+      // Show loading toast for large files
+      const fileSize = file.size || 0;
+      const sizeMB = (fileSize / (1024 * 1024)).toFixed(1);
+      const loadingToastId = fileSize > 1024 * 1024
+        ? toast.info(`Loading ${file.name}`, `${sizeMB} MB - Please wait...`)
+        : null;
+
+      // MIME type mapping for all media types
+      const mimeMap: Record<string, string> = {
+        // Images
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+        bmp: 'image/bmp', ico: 'image/x-icon',
+        // Audio
+        mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg',
+        flac: 'audio/flac', aac: 'audio/aac', m4a: 'audio/mp4',
+        // Video
+        mp4: 'video/mp4', webm: 'video/webm', mkv: 'video/x-matroska',
+        avi: 'video/x-msvideo', mov: 'video/quicktime', ogv: 'video/ogg',
+      };
+
+      if (!isRemote) {
+        // LOCAL FILES: Load as base64 via Rust command
+        // asset:// protocol returns 403 Forbidden, so we use read_local_file_base64 instead
+        const base64 = await invoke<string>('read_local_file_base64', { path: filePath });
+        blobUrl = `data:${mimeMap[ext] || 'application/octet-stream'};base64,${base64}`;
+      } else {
+        // REMOTE FILES: Download as base64 for images (audio/video need streaming - future)
+        if (category === 'image') {
           const base64 = await invoke<string>('ftp_read_file_base64', { path: filePath });
-          const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-          const mimeMap: Record<string, string> = {
-            jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-            gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
-          };
-          blobUrl = `data:${mimeMap[ext] || 'image/png'};base64,${base64}`;
-        } else {
-          // Local image: read as base64
-          const base64 = await invoke<string>('read_file_base64', { path: filePath });
-          const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-          const mimeMap: Record<string, string> = {
-            jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-            gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
-          };
           blobUrl = `data:${mimeMap[ext] || 'image/png'};base64,${base64}`;
         }
+        // For remote audio/video, we'd need to implement streaming download
+        // For now, show a message that remote media preview requires download first
       }
-      // TODO: For audio/video, implement streaming blob URL
-      // TODO: For PDF, implement pdf.js loading
+
+      // Dismiss loading toast
+      if (loadingToastId) {
+        toast.removeToast(loadingToastId);
+      }
 
       setUniversalPreviewFile({
         name: file.name,
@@ -1041,7 +803,7 @@ const App: React.FC = () => {
         size: file.size || 0,
         isRemote,
         blobUrl,
-        content,
+        mimeType: mimeMap[ext],
         modified: file.modified || undefined,
       });
       setUniversalPreviewOpen(true);
@@ -1397,7 +1159,7 @@ const App: React.FC = () => {
       {showMenuBar && (
         <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between px-6 py-3">
-            <Logo size="md" />
+            <Logo size="md" isConnected={isConnected} hasActivity={hasActivity} isReconnecting={isReconnecting} />
             <div className="flex items-center gap-3">
               {/* Quick System Menu Bar Toggle */}
               <button
@@ -1412,9 +1174,16 @@ const App: React.FC = () => {
                 <PanelTop size={18} className={systemMenuVisible ? 'text-blue-500' : 'text-gray-400'} />
               </button>
               <ThemeToggle theme={theme} setTheme={setTheme} />
-              {isConnected && (
-                <button onClick={disconnectFromFtp} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex items-center gap-2">
+              {isConnected ? (
+                <button onClick={disconnectFromFtp} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors shadow-sm hover:shadow-md flex items-center gap-2">
                   <X size={16} /> Disconnect
+                </button>
+              ) : !showConnectionScreen && (
+                <button
+                  onClick={() => setShowConnectionScreen(true)}
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+                >
+                  <Cloud size={16} /> Connect
                 </button>
               )}
             </div>
@@ -1423,7 +1192,7 @@ const App: React.FC = () => {
       )}
 
       <main className="flex-1 p-6 overflow-auto">
-        {!isConnected ? (
+        {!isConnected && showConnectionScreen ? (
           <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-6">
             {/* Quick Connect */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6">
@@ -1504,6 +1273,23 @@ const App: React.FC = () => {
                 }
               }} />
             </div>
+
+            {/* Skip to File Manager Button */}
+            <div className="md:col-span-2 text-center mt-4">
+              <button
+                onClick={async () => {
+                  setShowConnectionScreen(false);
+                  setActivePanel('local');
+                  await loadLocalFiles(currentLocalPath || '/');
+                }}
+                className="group px-6 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-xl text-gray-600 dark:text-gray-300 transition-all hover:scale-105 flex items-center gap-2 mx-auto"
+              >
+                <HardDrive size={18} className="group-hover:text-blue-500 transition-colors" />
+                <span>Skip to File Manager</span>
+                <ChevronRight size={16} className="opacity-50 group-hover:translate-x-1 transition-transform" />
+              </button>
+              <p className="text-xs text-gray-500 mt-2">Use as local file manager without FTP connection</p>
+            </div>
           </div>
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
@@ -1523,11 +1309,11 @@ const App: React.FC = () => {
                 <button onClick={() => activePanel === 'remote' ? changeRemoteDirectory('..') : loadLocalFiles(currentLocalPath.split('/').slice(0, -1).join('/') || '/')} className="px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg text-sm flex items-center gap-1.5">
                   <FolderUp size={16} /> Up
                 </button>
-                <button onClick={() => activePanel === 'remote' ? loadRemoteFiles() : loadLocalFiles(currentLocalPath)} className="px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg text-sm flex items-center gap-1.5">
-                  <RefreshCw size={16} /> Refresh
+                <button onClick={() => activePanel === 'remote' ? loadRemoteFiles() : loadLocalFiles(currentLocalPath)} className="group px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg text-sm flex items-center gap-1.5 transition-all hover:scale-105 hover:shadow-md">
+                  <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" /> Refresh
                 </button>
-                <button onClick={() => createFolder(activePanel === 'remote')} className="px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg text-sm flex items-center gap-1.5">
-                  <FolderPlus size={16} /> New
+                <button onClick={() => createFolder(activePanel === 'remote')} className="group px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg text-sm flex items-center gap-1.5 transition-all hover:scale-105 hover:shadow-md">
+                  <FolderPlus size={16} className="group-hover:scale-110 transition-transform" /> New
                 </button>
                 {activePanel === 'local' && (
                   <button onClick={() => openInFileManager(currentLocalPath)} className="px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg text-sm flex items-center gap-1.5">
@@ -1544,7 +1330,7 @@ const App: React.FC = () => {
                 </button>
                 {isConnected && (
                   <>
-                    <button onClick={() => uploadMultipleFiles()} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm flex items-center gap-1.5" title="Upload multiple files">
+                    <button onClick={() => uploadMultipleFiles()} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm flex items-center gap-1.5 shadow-sm hover:shadow-md transition-all" title="Upload multiple files">
                       <Upload size={16} /> Upload Files
                     </button>
                     <button
@@ -1599,11 +1385,32 @@ const App: React.FC = () => {
             <div className="flex h-[calc(100vh-220px)]">
               {/* Remote */}
               <div className="w-1/2 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-                <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-sm font-medium truncate flex items-center gap-2">
-                  <Globe size={14} className={isSyncNavigation ? 'text-purple-500' : 'text-green-500'} /> {currentRemotePath}
+                <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-sm font-medium flex items-center gap-2">
+                  <Globe size={14} className={isSyncNavigation ? 'text-purple-500' : 'text-green-500'} />
+                  <input
+                    type="text"
+                    value={isConnected ? currentRemotePath : 'Not Connected'}
+                    onChange={(e) => setCurrentRemotePath(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && isConnected && changeRemoteDirectory((e.target as HTMLInputElement).value)}
+                    disabled={!isConnected}
+                    className="flex-1 bg-transparent border-none outline-none text-sm cursor-text select-all disabled:cursor-default disabled:text-gray-400"
+                    title={isConnected ? "Click to edit path, Enter to navigate" : "Not connected to server"}
+                  />
                 </div>
                 <div className="flex-1 overflow-auto">
-                  {viewMode === 'list' ? (
+                  {!isConnected ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Cloud size={64} className="mb-4 opacity-30" />
+                      <p className="text-lg font-medium">Not Connected</p>
+                      <p className="text-sm mt-1">Click "Connect" to access remote files</p>
+                      <button
+                        onClick={() => setShowConnectionScreen(true)}
+                        className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+                      >
+                        <Cloud size={16} /> Connect to Server
+                      </button>
+                    </div>
+                  ) : viewMode === 'list' ? (
                     <table className="w-full">
                       <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
                         <tr>
@@ -1724,9 +1531,16 @@ const App: React.FC = () => {
 
               {/* Local */}
               <div className={`${showLocalPreview ? 'w-1/3' : 'w-1/2'} flex flex-col transition-all duration-300`}>
-                <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-sm font-medium truncate flex items-center gap-2">
+                <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-sm font-medium flex items-center gap-2">
                   <HardDrive size={14} className={isSyncNavigation ? 'text-purple-500' : 'text-blue-500'} />
-                  <span className="truncate flex-1">{currentLocalPath}</span>
+                  <input
+                    type="text"
+                    value={currentLocalPath}
+                    onChange={(e) => setCurrentLocalPath(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && changeLocalDirectory((e.target as HTMLInputElement).value)}
+                    className="flex-1 bg-transparent border-none outline-none text-sm cursor-text select-all"
+                    title="Click to edit path, Enter to navigate"
+                  />
                 </div>
                 <div className="flex-1 overflow-auto">
                   {viewMode === 'list' ? (
@@ -1863,15 +1677,15 @@ const App: React.FC = () => {
 
               {/* Preview Panel */}
               {showLocalPreview && (
-                <div className="w-1/6 flex flex-col bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 animate-slide-in-right">
+                <div className="w-1/6 flex flex-col bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 animate-slide-in-right min-w-[200px]">
                   <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-sm font-medium flex items-center gap-2">
-                    <Eye size={14} /> Preview
+                    <Eye size={14} className="text-blue-500" /> File Info
                   </div>
                   <div className="flex-1 overflow-auto p-3">
                     {previewFile ? (
-                      <div className="space-y-3">
-                        {/* File Icon/Preview */}
-                        <div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden">
+                      <div className="space-y-4">
+                        {/* File Icon/Thumbnail */}
+                        <div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-inner">
                           {previewImageBase64 ? (
                             <img
                               src={previewImageBase64}
@@ -1879,24 +1693,130 @@ const App: React.FC = () => {
                               className="w-full h-full object-contain"
                             />
                           ) : /\.(jpg|jpeg|png|gif|svg|webp|bmp)$/i.test(previewFile.name) ? (
-                            <div className="text-gray-400 animate-pulse">Loading...</div>
+                            <div className="text-gray-400 animate-pulse flex flex-col items-center">
+                              <Image size={32} className="text-blue-400 mb-1" />
+                              <span className="text-xs">Loading...</span>
+                            </div>
+                          ) : /\.(mp4|webm|mov|avi|mkv)$/i.test(previewFile.name) ? (
+                            <Video size={48} className="text-purple-500" />
+                          ) : /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(previewFile.name) ? (
+                            <Music size={48} className="text-green-500" />
+                          ) : /\.pdf$/i.test(previewFile.name) ? (
+                            <FileText size={48} className="text-red-500" />
+                          ) : /\.(js|jsx|ts|tsx|py|rs|go|java|php|rb|c|cpp|h|css|scss|html|xml|json|yaml|yml|toml|sql|sh|bash)$/i.test(previewFile.name) ? (
+                            <Code size={48} className="text-cyan-400" />
+                          ) : /\.(zip|tar|gz|rar|7z)$/i.test(previewFile.name) ? (
+                            <Archive size={48} className="text-yellow-500" />
+                          ) : previewFile.is_dir ? (
+                            <Folder size={48} className="text-yellow-400" />
                           ) : (
                             <FileText size={48} className="text-gray-400" />
                           )}
                         </div>
-                        {/* Metadata */}
-                        <div className="space-y-1 text-xs">
-                          <p className="font-medium truncate" title={previewFile.name}>{previewFile.name}</p>
-                          <p className="text-gray-500">Size: {formatBytes(previewFile.size || 0)}</p>
-                          <p className="text-gray-500">Type: {previewFile.is_dir ? 'Directory' : previewFile.name.split('.').pop()?.toUpperCase() || 'File'}</p>
-                          <p className="text-gray-500">Modified: {previewFile.modified || 'Unknown'}</p>
+
+                        {/* File Name */}
+                        <div className="text-center">
+                          <p className="font-medium text-sm truncate" title={previewFile.name}>{previewFile.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                            {previewFile.is_dir ? 'Folder' : previewFile.name.split('.').pop() || 'File'}
+                          </p>
+                        </div>
+
+                        {/* Detailed Info */}
+                        <div className="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-3 space-y-2 text-xs">
+                          {/* Size */}
+                          {!previewFile.is_dir && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-500 flex items-center gap-1.5">
+                                <HardDrive size={12} /> Size
+                              </span>
+                              <span className="font-medium">{formatBytes(previewFile.size || 0)}</span>
+                            </div>
+                          )}
+
+                          {/* Type */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 flex items-center gap-1.5">
+                              <FileType size={12} /> Type
+                            </span>
+                            <span className="font-medium">
+                              {previewFile.is_dir ? 'Directory' : (() => {
+                                const ext = previewFile.name.split('.').pop()?.toLowerCase();
+                                if (/^(jpg|jpeg|png|gif|svg|webp|bmp)$/.test(ext || '')) return 'Image';
+                                if (/^(mp4|webm|mov|avi|mkv)$/.test(ext || '')) return 'Video';
+                                if (/^(mp3|wav|ogg|flac|m4a|aac)$/.test(ext || '')) return 'Audio';
+                                if (ext === 'pdf') return 'PDF';
+                                if (/^(js|jsx|ts|tsx|py|rs|go|java|php|rb|c|cpp|h|css|scss|html|xml|json|yaml|yml|toml|sql|sh|bash)$/.test(ext || '')) return 'Code';
+                                if (/^(zip|tar|gz|rar|7z)$/.test(ext || '')) return 'Archive';
+                                if (/^(txt|md|log|csv)$/.test(ext || '')) return 'Text';
+                                return ext?.toUpperCase() || 'File';
+                              })()}
+                            </span>
+                          </div>
+
+                          {/* Modified */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 flex items-center gap-1.5">
+                              <Clock size={12} /> Modified
+                            </span>
+                            <span className="font-medium text-right">{previewFile.modified || '—'}</span>
+                          </div>
+
+                          {/* Extension */}
+                          {!previewFile.is_dir && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-500 flex items-center gap-1.5">
+                                <Database size={12} /> Extension
+                              </span>
+                              <span className="font-mono text-xs px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 rounded">
+                                .{previewFile.name.split('.').pop()?.toLowerCase() || '—'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="space-y-2">
+                          {/* Open Preview button */}
+                          {isMediaPreviewable(previewFile.name) && (
+                            <button
+                              onClick={() => openUniversalPreview(previewFile, activePanel === 'remote')}
+                              className="w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg flex items-center justify-center gap-2 transition-colors"
+                            >
+                              <Eye size={14} /> Open Preview
+                            </button>
+                          )}
+
+                          {/* View Source - for text/code files */}
+                          {/\.(js|jsx|ts|tsx|py|rs|go|java|php|rb|c|cpp|h|css|scss|html|xml|json|yaml|yml|toml|sql|sh|bash|txt|md|log)$/i.test(previewFile.name) && (
+                            <button
+                              onClick={() => openUniversalPreview(previewFile, activePanel === 'remote')}
+                              className="w-full px-3 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-xs rounded-lg flex items-center justify-center gap-2 transition-colors"
+                            >
+                              <Code size={14} /> View Source
+                            </button>
+                          )}
+
+                          {/* Copy Path */}
+                          <button
+                            onClick={() => {
+                              const path = activePanel === 'local'
+                                ? `${currentLocalPath}/${previewFile.name}`
+                                : `${currentRemotePath}/${previewFile.name}`;
+                              navigator.clipboard.writeText(path);
+                              toast.success('Copied', 'Path copied to clipboard');
+                            }}
+                            className="w-full px-3 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-xs rounded-lg flex items-center justify-center gap-2 transition-colors"
+                          >
+                            <Copy size={14} /> Copy Path
+                          </button>
                         </div>
                       </div>
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm">
-                        <Eye size={24} className="mb-2 opacity-50" />
-                        <p>Select a file</p>
-                        <p className="text-xs">to preview</p>
+                        <Eye size={32} className="mb-3 opacity-30" />
+                        <p className="font-medium">No file selected</p>
+                        <p className="text-xs mt-1 text-center">Click on a file to view its details</p>
                       </div>
                     )}
                   </div>

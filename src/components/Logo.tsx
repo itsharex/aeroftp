@@ -4,6 +4,9 @@ interface LogoProps {
     className?: string;
     size?: 'sm' | 'md' | 'lg' | 'xl';
     showText?: boolean;  // For compatibility, but now using horizontal logos with text
+    isConnected?: boolean;  // Cyan glow when connected
+    hasActivity?: boolean;  // Pulse animation during transfers
+    isReconnecting?: boolean;  // Yellow warning glow when reconnecting
 }
 
 // Logo sizes mapping to actual logo files with text
@@ -25,7 +28,10 @@ const iconSizes = {
 export const Logo: React.FC<LogoProps> = ({
     className = '',
     size = 'md',
-    showText = true
+    showText = true,
+    isConnected = false,
+    hasActivity = false,
+    isReconnecting = false,
 }) => {
     const [isDark, setIsDark] = useState(false);
 
@@ -47,6 +53,20 @@ export const Logo: React.FC<LogoProps> = ({
         return () => observer.disconnect();
     }, []);
 
+    // Glow styles based on connection state
+    const getGlowStyle = () => {
+        if (isReconnecting) {
+            return { filter: 'drop-shadow(0 0 8px rgba(234, 179, 8, 0.6))' };
+        }
+        if (isConnected) {
+            return { filter: 'drop-shadow(0 0 6px rgba(34, 211, 238, 0.5))' };
+        }
+        return {};
+    };
+
+    // Animation class for activity
+    const activityClass = hasActivity ? 'animate-pulse' : '';
+
     // If showText is true, use horizontal logo with text
     if (showText) {
         const { width, height, file } = logoSizes[size];
@@ -62,7 +82,8 @@ export const Logo: React.FC<LogoProps> = ({
                     alt="AeroFTP"
                     width={width}
                     height={height}
-                    className="shrink-0 object-contain"
+                    className={`shrink-0 object-contain transition-all duration-300 ${activityClass}`}
+                    style={getGlowStyle()}
                     onError={(e) => {
                         // Fallback to color version
                         (e.target as HTMLImageElement).src = `/icons/AeroFTP_logo_color_${file}.png`;
@@ -81,7 +102,8 @@ export const Logo: React.FC<LogoProps> = ({
                 alt="AeroFTP"
                 width={iconSize}
                 height={iconSize}
-                className="shrink-0 object-contain"
+                className={`shrink-0 object-contain transition-all duration-300 ${activityClass}`}
+                style={getGlowStyle()}
             />
         </div>
     );

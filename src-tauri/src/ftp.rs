@@ -45,6 +45,7 @@ pub struct FtpManager {
     current_path: String,
     server: Option<String>,
     username: Option<String>,
+    password: Option<String>,  // Stored for auto-reconnect
 }
 
 #[allow(dead_code)]
@@ -55,6 +56,7 @@ impl FtpManager {
             current_path: "/".to_string(),
             server: None,
             username: None,
+            password: None,
         }
     }
 
@@ -97,6 +99,7 @@ impl FtpManager {
             .map_err(|e| FtpManagerError::OperationFailed(format!("Login failed: {}", e)))?;
         
         self.username = Some(username.to_string());
+        self.password = Some(password.to_string());  // Store for auto-reconnect
         info!("Successfully logged in as {}", username);
         
         // Get current working directory after login
@@ -539,6 +542,42 @@ impl FtpManager {
     /// Check if connected
     pub fn is_connected(&self) -> bool {
         self.stream.is_some()
+    }
+
+    /// Send NOOP command to keep connection alive
+    pub async fn noop(&mut self) -> Result<()> {
+        let stream = self.stream.as_mut()
+            .ok_or(FtpManagerError::NotConnected)?;
+        
+        stream.noop()
+            .await
+            .map_err(|e| FtpManagerError::OperationFailed(format!("NOOP failed: {}", e)))?;
+        
+        Ok(())
+    }
+
+    /// Attempt to reconnect using stored credentials
+    pub async fn reconnect(&mut self) -> Result<()> {
+        let server = self.server.clone()
+            .ok_or(FtpManagerError::NotConnected)?;
+        let username = self.username.clone()
+            .ok_or(FtpManagerError::NotConnected)?;
+        let password = self.password.clone()
+            .ok_or(FtpManagerError::NotConnected)?;
+        
+        info!("Attempting to reconnect to {}", server);
+        
+        // Disconnect existing stream if any
+        if self.stream.is_some() {
+            let _ = self.disconnect().await;
+        }
+        
+        // Reconnect
+        self.connect(&server).await?;
+        self.login(&username, &password).await?;
+        
+        info!("Successfully reconnected to {}", server);
+        Ok(())
     }
 
     /// Get current path

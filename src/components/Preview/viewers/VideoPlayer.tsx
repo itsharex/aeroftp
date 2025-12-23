@@ -53,6 +53,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     // Video source URL
     const videoSrc = file.blobUrl || file.content as string || '';
+    console.log('[VideoPlayer] Source URL:', videoSrc, 'blobUrl:', file.blobUrl);
 
     // Auto-hide controls after 3 seconds of inactivity
     const resetControlsTimeout = useCallback(() => {
@@ -111,14 +112,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const togglePlay = useCallback(async () => {
         if (!videoRef.current) return;
 
-        if (playback.isPlaying) {
-            videoRef.current.pause();
-        } else {
+        // Use actual video element state, not our playback state
+        if (videoRef.current.paused) {
             await videoRef.current.play();
+        } else {
+            videoRef.current.pause();
         }
-        setPlayback(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
+        // Note: isPlaying state is updated by onPlay/onPause handlers
         resetControlsTimeout();
-    }, [playback.isPlaying, resetControlsTimeout]);
+    }, [resetControlsTimeout]);
 
     const seek = useCallback((time: number) => {
         if (videoRef.current) {

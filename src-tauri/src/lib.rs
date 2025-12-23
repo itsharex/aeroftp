@@ -123,6 +123,32 @@ async fn disconnect_ftp(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn check_connection(state: State<'_, AppState>) -> Result<bool, String> {
+    let ftp_manager = state.ftp_manager.lock().await;
+    Ok(ftp_manager.is_connected())
+}
+
+#[tauri::command]
+async fn ftp_noop(state: State<'_, AppState>) -> Result<(), String> {
+    let mut ftp_manager = state.ftp_manager.lock().await;
+    ftp_manager.noop()
+        .await
+        .map_err(|e| format!("NOOP failed: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn reconnect_ftp(state: State<'_, AppState>) -> Result<(), String> {
+    info!("Attempting FTP reconnection");
+    let mut ftp_manager = state.ftp_manager.lock().await;
+    ftp_manager.reconnect()
+        .await
+        .map_err(|e| format!("Reconnection failed: {}", e))?;
+    info!("FTP reconnection successful");
+    Ok(())
+}
+
+#[tauri::command]
 async fn list_files(state: State<'_, AppState>) -> Result<FileListResponse, String> {
     let mut ftp_manager = state.ftp_manager.lock().await;
     
@@ -599,6 +625,35 @@ async fn read_local_file(path: String) -> Result<String, String> {
         .map_err(|e| format!("Failed to read file: {}", e))?;
     
     Ok(content)
+}
+
+#[tauri::command]
+async fn read_local_file_base64(path: String, max_size_mb: Option<u32>) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    
+    // Default max size is 50MB for media files (audio/video)
+    let max_size: u64 = (max_size_mb.unwrap_or(50) as u64) * 1024 * 1024;
+    
+    // Check file size first
+    let metadata = tokio::fs::metadata(&path)
+        .await
+        .map_err(|e| format!("Failed to read file metadata: {}", e))?;
+    
+    if metadata.len() > max_size {
+        return Err(format!(
+            "File too large for preview ({:.1} MB). Max: {} MB",
+            metadata.len() as f64 / (1024.0 * 1024.0),
+            max_size / (1024 * 1024)
+        ));
+    }
+    
+    // Read file as binary
+    let content = tokio::fs::read(&path)
+        .await
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+    
+    // Encode as base64
+    Ok(STANDARD.encode(&content))
 }
 
 #[tauri::command]
@@ -1171,6 +1226,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             connect_ftp,
             disconnect_ftp,
+            check_connection,
+            ftp_noop,
+            reconnect_ftp,
             list_files,
             change_directory,
             download_file,
@@ -1188,6 +1246,7 @@ pub fn run() {
             read_file_base64,
             ftp_read_file_base64,
             read_local_file,
+            read_local_file_base64,
             preview_remote_file,
             save_local_file,
             save_remote_file,

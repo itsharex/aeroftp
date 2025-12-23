@@ -19,8 +19,9 @@ import { getPreviewCategory, formatFileSize, getCategoryIcon } from './utils/fil
 import { ImageViewer } from './viewers/ImageViewer';
 import { AudioPlayer } from './viewers/AudioPlayer';
 import { VideoPlayer } from './viewers/VideoPlayer';
+import { PDFViewer } from './viewers/PDFViewer';
+import { TextViewer } from './viewers/TextViewer';
 // Future imports:
-// import { PDFViewer } from './viewers/PDFViewer';
 // import { MarkdownViewer } from './viewers/MarkdownViewer';
 // import { TextViewer } from './viewers/TextViewer';
 
@@ -36,6 +37,12 @@ export const UniversalPreview: React.FC<UniversalPreviewProps> = ({
 }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Reset error when file changes
+    useEffect(() => {
+        setError(null);
+        setIsLoading(false);
+    }, [file?.name, file?.path]);
 
     // Determine file category
     const category = file ? getPreviewCategory(file.name) : 'unknown';
@@ -102,29 +109,11 @@ export const UniversalPreview: React.FC<UniversalPreviewProps> = ({
                 return <VideoPlayer file={file} onError={handleViewerError} />;
 
             case 'pdf':
-                // Placeholder until PDFViewer is implemented
-                return (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                        <div className="text-center">
-                            <div className="text-6xl mb-4">📄</div>
-                            <div className="text-lg">PDF Viewer</div>
-                            <div className="text-sm text-gray-500 mt-2">Coming soon...</div>
-                        </div>
-                    </div>
-                );
+                return <PDFViewer file={file} onError={handleViewerError} />;
 
             case 'markdown':
             case 'text':
-                // Placeholder until TextViewer is implemented
-                return (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                        <div className="text-center">
-                            <div className="text-6xl mb-4">📝</div>
-                            <div className="text-lg">Text Viewer</div>
-                            <div className="text-sm text-gray-500 mt-2">Coming soon...</div>
-                        </div>
-                    </div>
-                );
+                return <TextViewer file={file} onError={handleViewerError} />;
 
             default:
                 return (
