@@ -166,7 +166,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                                                 placeholder="e.g., /home/user/Downloads"
                                                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"
                                             />
-                                            <button className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const selected = await open({ directory: true, multiple: false, title: 'Select Default Local Folder' });
+                                                        if (selected && typeof selected === 'string') {
+                                                            updateSetting('defaultLocalPath', selected);
+                                                        }
+                                                    } catch (e) { console.error('Folder picker error:', e); }
+                                                }}
+                                                className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                                                title="Browse"
+                                            >
                                                 <FolderOpen size={16} />
                                             </button>
                                         </div>
