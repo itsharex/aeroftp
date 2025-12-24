@@ -54,6 +54,18 @@ pub struct UploadParams {
     remote_path: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct DownloadFolderParams {
+    remote_path: String,
+    local_path: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UploadFolderParams {
+    local_path: String,
+    remote_path: String,
+}
+
 #[derive(Serialize)]
 pub struct FileListResponse {
     files: Vec<RemoteFile>,
@@ -499,9 +511,9 @@ async fn open_in_file_manager(path: String) -> Result<(), String> {
 #[tauri::command]
 async fn delete_remote_file(state: State<'_, AppState>, path: String, is_dir: bool) -> Result<(), String> {
     let mut ftp_manager = state.ftp_manager.lock().await;
-    
+
     if is_dir {
-        ftp_manager.remove_dir(&path)
+        ftp_manager.delete_folder_recursive(&path)
             .await
             .map_err(|e| format!("Failed to delete directory: {}", e))?;
     } else {
@@ -509,7 +521,7 @@ async fn delete_remote_file(state: State<'_, AppState>, path: String, is_dir: bo
             .await
             .map_err(|e| format!("Failed to delete file: {}", e))?;
     }
-    
+
     Ok(())
 }
 

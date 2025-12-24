@@ -8,6 +8,16 @@ import {
   FileListResponse, ConnectionParams, DownloadParams, UploadParams,
   LocalFile, TransferEvent, TransferProgress, RemoteFile, FtpSession
 } from './types';
+
+interface DownloadFolderParams {
+  remote_path: string;
+  local_path: string;
+}
+
+interface UploadFolderParams {
+  local_path: string;
+  remote_path: string;
+}
 import { SessionTabs } from './components/SessionTabs';
 import { PermissionsDialog } from './components/PermissionsDialog';
 import { ToastContainer, useToast } from './components/Toast';
@@ -601,20 +611,35 @@ const App: React.FC = () => {
     setIsSyncNavigation(!isSyncNavigation);
   };
 
-  const downloadFile = async (remoteFilePath: string, fileName: string) => {
+  const downloadFile = async (remoteFilePath: string, fileName: string, destinationPath?: string, isDir: boolean = false) => {
     try {
-      const downloadPath = await open({ directory: true, multiple: false, defaultPath: await downloadDir() });
-      if (downloadPath) {
-        const params: DownloadParams = { remote_path: remoteFilePath, local_path: `${downloadPath}/${fileName}` };
-        await invoke('download_file', { params });
+      if (isDir) {
+        const downloadPath = destinationPath || await open({ directory: true, multiple: false, defaultPath: await downloadDir() });
+        if (downloadPath) {
+          const folderPath = `${downloadPath}/${fileName}`;
+          const params: DownloadFolderParams = { remote_path: remoteFilePath, local_path: folderPath };
+          await invoke('download_folder', { params });
+        }
+      } else {
+        const downloadPath = destinationPath || await open({ directory: true, multiple: false, defaultPath: await downloadDir() });
+        if (downloadPath) {
+          const params: DownloadParams = { remote_path: remoteFilePath, local_path: `${downloadPath}/${fileName}` };
+          await invoke('download_file', { params });
+        }
       }
     } catch (error) { toast.error('Download Failed', String(error)); }
   };
 
-  const uploadFile = async (localFilePath: string, fileName: string) => {
+  const uploadFile = async (localFilePath: string, fileName: string, isDir: boolean = false) => {
     try {
-      const remotePath = `${currentRemotePath}${currentRemotePath.endsWith('/') ? '' : '/'}${fileName}`;
-      await invoke('upload_file', { params: { local_path: localFilePath, remote_path: remotePath } as UploadParams });
+      if (isDir) {
+        const remotePath = `${currentRemotePath}${currentRemotePath.endsWith('/') ? '' : '/'}${fileName}`;
+        const params: UploadFolderParams = { local_path: localFilePath, remote_path: remotePath };
+        await invoke('upload_folder', { params });
+      } else {
+        const remotePath = `${currentRemotePath}${currentRemotePath.endsWith('/') ? '' : '/'}${fileName}`;
+        await invoke('upload_file', { params: { local_path: localFilePath, remote_path: remotePath } as UploadParams });
+      }
     } catch (error) { toast.error('Upload Failed', String(error)); }
   };
 
@@ -748,7 +773,8 @@ const App: React.FC = () => {
         for (const item of queueItems) {
           uploadQueue.startUpload(item.id);
           try {
-            await uploadFile(item.filePath, item.fileName);
+            const file = localFiles.find(f => f.path === item.filePath);
+            await uploadFile(item.filePath, item.fileName, file?.is_dir || false);
             uploadQueue.completeUpload(item.id);
           } catch (error) {
             uploadQueue.failUpload(item.id, String(error));
@@ -775,7 +801,7 @@ const App: React.FC = () => {
       for (const filePath of files) {
         // Extract filename from full path (cross-platform handle)
         const fileName = filePath.replace(/^.*[\\\/]/, '');
-        await uploadFile(filePath, fileName);
+        await uploadFile(filePath, fileName, false);
       }
     }
   };
@@ -788,9 +814,9 @@ const App: React.FC = () => {
 
     const filesToDownload = names.map(n => remoteFiles.find(f => f.name === n)).filter(Boolean) as RemoteFile[];
     if (filesToDownload.length > 0) {
-      toast.info('Download Started', `Downloading ${filesToDownload.length} files...`);
+      toast.info('Download Started', `Downloading ${filesToDownload.length} items...`);
       for (const file of filesToDownload) {
-        await downloadFile(file.path, file.name);
+        await downloadFile(file.path, file.name, currentLocalPath, file.is_dir);
       }
       setSelectedRemoteFiles(new Set());
     }
@@ -812,7 +838,12 @@ const App: React.FC = () => {
         }
         await loadRemoteFiles();
         setSelectedRemoteFiles(new Set());
-        toast.success('Selected items deleted');
+        const folderCount = names.filter(n => remoteFiles.find(f => f.name === n)?.is_dir).length;
+        const fileCount = names.length - folderCount;
+        const messages = [];
+        if (folderCount > 0) messages.push(`${folderCount} folder${folderCount > 1 ? 's' : ''}`);
+        if (fileCount > 0) messages.push(`${fileCount} file${fileCount > 1 ? 's' : ''}`);
+        toast.success(messages.join(', '), `${messages.join(' and ')} deleted`);
       }
     });
   };
@@ -833,7 +864,12 @@ const App: React.FC = () => {
         }
         await loadLocalFiles(currentLocalPath);
         setSelectedLocalFiles(new Set());
-        toast.success('Selected items deleted');
+        const folderCount = names.filter(n => localFiles.find(f => f.name === n)?.is_dir).length;
+        const fileCount = names.length - folderCount;
+        const messages = [];
+        if (folderCount > 0) messages.push(`${folderCount} folder${folderCount > 1 ? 's' : ''}`);
+        if (fileCount > 0) messages.push(`${fileCount} file${fileCount > 1 ? 's' : ''}`);
+        toast.success(messages.join(', '), `${messages.join(' and ')} deleted`);
       }
     });
   };
@@ -990,7 +1026,7 @@ const App: React.FC = () => {
 
   const handleRemoteFileAction = async (file: RemoteFile) => {
     if (file.is_dir) await changeRemoteDirectory(file.name);
-    else await downloadFile(file.path, file.name);
+    else await downloadFile(file.path, file.name, currentLocalPath, false);
   };
 
   const openInFileManager = async (path: string) => { try { await invoke('open_in_file_manager', { path }); } catch { } };
@@ -1490,7 +1526,11 @@ const App: React.FC = () => {
                               if (file.is_dir) {
                                 changeLocalDirectory(file.path);
                               } else {
-                                openInFileManager(file.path);
+                                if (isConnected) {
+                                  uploadFile(file.path, file.name, false);
+                                } else {
+                                  openInFileManager(file.path);
+                                }
                               }
                             }}
                             onContextMenu={(e: React.MouseEvent) => showLocalContextMenu(e, file)}
@@ -1546,7 +1586,11 @@ const App: React.FC = () => {
                             if (file.is_dir) {
                               changeLocalDirectory(file.path);
                             } else {
-                              openInFileManager(file.path);
+                              if (isConnected) {
+                                uploadFile(file.path, file.name, false);
+                              } else {
+                                openInFileManager(file.path);
+                              }
                             }
                           }}
                           onContextMenu={(e: React.MouseEvent) => showLocalContextMenu(e, file)}
