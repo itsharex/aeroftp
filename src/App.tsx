@@ -718,7 +718,6 @@ const App: React.FC = () => {
         // Trigger sync
         try {
           await invoke('trigger_cloud_sync');
-          toast.info('Sync Started', 'Syncing cloud files...');
         } catch (syncError) {
           console.log('Sync error:', syncError);
         }
