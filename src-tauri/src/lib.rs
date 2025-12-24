@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{info, warn, error};
 
 mod ftp;
 mod sync;
@@ -1226,6 +1226,10 @@ fn update_conflict_strategy(strategy: ConflictStrategy) -> Result<(), String> {
 async fn trigger_cloud_sync(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let config = cloud_config::load_cloud_config();
     
+    info!("AeroCloud sync triggered");
+    info!("Config - enabled: {}, local: {:?}, remote: {}", 
+        config.enabled, config.local_folder, config.remote_folder);
+    
     if !config.enabled {
         return Err("AeroCloud is not configured. Please set it up first.".to_string());
     }
@@ -1237,6 +1241,17 @@ async fn trigger_cloud_sync(state: tauri::State<'_, AppState>) -> Result<String,
         return Err("Not connected to FTP server. Please connect first.".to_string());
     }
     
+    info!("FTP connected, starting sync...");
+    
+    // First, ensure remote folder exists and navigate to it
+    if let Err(e) = ftp_manager.change_dir(&config.remote_folder).await {
+        info!("Remote folder {} doesn't exist, creating it...", config.remote_folder);
+        // Try to create the folder
+        if let Err(e) = ftp_manager.mkdir(&config.remote_folder).await {
+            warn!("Could not create remote folder: {}", e);
+        }
+    }
+    
     // Create cloud service and run sync
     let cloud_service = cloud_service::CloudService::new();
     cloud_service.init(config.clone()).await;
@@ -1244,13 +1259,21 @@ async fn trigger_cloud_sync(state: tauri::State<'_, AppState>) -> Result<String,
     match cloud_service.perform_full_sync(&mut ftp_manager).await {
         Ok(result) => {
             let summary = format!(
-                "Sync complete: {} uploaded, {} downloaded, {} conflicts",
-                result.uploaded, result.downloaded, result.conflicts
+                "Sync complete: {} uploaded, {} downloaded, {} conflicts, {} skipped, {} errors",
+                result.uploaded, result.downloaded, result.conflicts, result.skipped, result.errors.len()
             );
             info!("{}", summary);
+            if !result.errors.is_empty() {
+                for err in &result.errors {
+                    warn!("Sync error: {}", err);
+                }
+            }
             Ok(summary)
         }
-        Err(e) => Err(format!("Sync failed: {}", e))
+        Err(e) => {
+            error!("Sync failed: {}", e);
+            Err(format!("Sync failed: {}", e))
+        }
     }
 }
 
