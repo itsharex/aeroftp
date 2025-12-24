@@ -1403,29 +1403,40 @@ async fn perform_background_sync(config: &cloud_config::CloudConfig) -> Result<c
         password: String,
     }
     
+    info!("Background sync: looking for credentials at {:?} for profile '{}'", creds_path, server_profile);
+    
     // Try to load credentials for the profile
-    if let Ok(content) = tokio::fs::read_to_string(&creds_path).await {
-        if let Ok(creds_map) = serde_json::from_str::<std::collections::HashMap<String, SavedCredentials>>(&content) {
-            if let Some(creds) = creds_map.get(server_profile) {
-                // Connect to server
-                ftp_manager.connect(&creds.server)
-                    .await
-                    .map_err(|e| format!("Failed to connect for background sync: {}", e))?;
-                
-                // Login with credentials
-                ftp_manager.login(&creds.username, &creds.password)
-                    .await
-                    .map_err(|e| format!("Failed to login for background sync: {}", e))?;
-                    
-                info!("Background sync: connected to {} as {}", creds.server, creds.username);
-            } else {
-                return Err(format!("No saved credentials for profile: {}", server_profile));
+    match tokio::fs::read_to_string(&creds_path).await {
+        Ok(content) => {
+            info!("Background sync: credentials file found, parsing...");
+            match serde_json::from_str::<std::collections::HashMap<String, SavedCredentials>>(&content) {
+                Ok(creds_map) => {
+                    info!("Background sync: found {} saved profiles", creds_map.len());
+                    if let Some(creds) = creds_map.get(server_profile) {
+                        // Connect to server
+                        ftp_manager.connect(&creds.server)
+                            .await
+                            .map_err(|e| format!("Failed to connect for background sync: {}", e))?;
+                        
+                        // Login with credentials
+                        ftp_manager.login(&creds.username, &creds.password)
+                            .await
+                            .map_err(|e| format!("Failed to login for background sync: {}", e))?;
+                            
+                        info!("Background sync: connected to {} as {}", creds.server, creds.username);
+                    } else {
+                        let available: Vec<_> = creds_map.keys().collect();
+                        return Err(format!("No saved credentials for profile '{}'. Available: {:?}", server_profile, available));
+                    }
+                }
+                Err(e) => {
+                    return Err(format!("Failed to parse saved credentials: {}", e));
+                }
             }
-        } else {
-            return Err("Failed to parse saved credentials".to_string());
         }
-    } else {
-        return Err("No saved credentials file. Background sync requires saved server credentials.".to_string());
+        Err(e) => {
+            return Err(format!("No saved credentials file at {:?}: {}. Please re-setup AeroCloud to save credentials.", creds_path, e));
+        }
     }
     
     // Navigate to remote folder

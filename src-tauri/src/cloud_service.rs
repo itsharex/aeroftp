@@ -439,24 +439,25 @@ impl CloudService {
                 }
             }
             SyncAction::Download => {
-                if !comparison.is_dir {
-                    if let Some(remote_info) = &comparison.remote_info {
-                        let local_path = config.local_folder.join(&comparison.relative_path);
-                        
-                        // Ensure parent directory exists
-                        if let Some(parent) = local_path.parent() {
-                            std::fs::create_dir_all(parent).ok();
-                        }
-                        
-                        ftp_manager
-                            .download_file_with_progress(
-                                &remote_info.path,
-                                &local_path.to_string_lossy(),
-                                |_| {},
-                            )
-                            .await
-                            .map_err(|e| format!("Download failed: {}", e))?;
+                let local_path = config.local_folder.join(&comparison.relative_path);
+                
+                if comparison.is_dir {
+                    // Create local directory
+                    std::fs::create_dir_all(&local_path).ok();
+                } else if let Some(remote_info) = &comparison.remote_info {
+                    // Ensure parent directory exists
+                    if let Some(parent) = local_path.parent() {
+                        std::fs::create_dir_all(parent).ok();
                     }
+                    
+                    ftp_manager
+                        .download_file_with_progress(
+                            &remote_info.path,
+                            &local_path.to_string_lossy(),
+                            |_| {},
+                        )
+                        .await
+                        .map_err(|e| format!("Download failed: {}", e))?;
                 }
             }
             _ => {}
