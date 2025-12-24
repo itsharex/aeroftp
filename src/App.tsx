@@ -41,7 +41,7 @@ import {
   Download, Upload, Pencil, Trash2, X, ArrowUp, ArrowDown,
   Folder, FileText, Globe, HardDrive, Settings, Search, Eye, Link2, Unlink, PanelTop, Shield, Cloud,
   Archive, Image, Video, FileCode, Music, File, FileSpreadsheet, FileType, Code, Database, Clock,
-  Copy, Clipboard, ExternalLink, List, LayoutGrid, ChevronRight, Plus
+  Copy, Clipboard, ExternalLink, List, LayoutGrid, ChevronRight, Plus, CheckCircle2
 } from 'lucide-react';
 
 // Extracted utilities and components (Phase 1 modularization)
@@ -95,6 +95,8 @@ const App: React.FC = () => {
   const [cloudSyncing, setCloudSyncing] = useState(false);  // AeroCloud sync in progress
   const [isCloudActive, setIsCloudActive] = useState(false);  // AeroCloud is enabled (persistent)
   const [cloudServerName, setCloudServerName] = useState<string>('');  // Cloud server profile name
+  const [cloudLastSync, setCloudLastSync] = useState<string | null>(null);  // Last sync timestamp for badges
+  const [cloudLocalFolder, setCloudLocalFolder] = useState<string>('');  // Cloud local folder path
   const [showConnectionScreen, setShowConnectionScreen] = useState(true);  // Initial connection screen, can be skipped
   const [showMenuBar, setShowMenuBar] = useState(true);  // Internal header visibility
   const [systemMenuVisible, setSystemMenuVisible] = useState(true);  // Native system menu bar
@@ -126,6 +128,48 @@ const App: React.FC = () => {
   // View Mode (list/grid)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const isImageFile = (name: string) => /\.(jpg|jpeg|png|gif|svg|webp|bmp|ico)$/i.test(name);
+
+  // Sync Badge Helper - returns badge element if file is in cloud folder
+  const getSyncBadge = (filePath: string, fileModified: string | undefined, isLocal: boolean) => {
+    // Only show badges if cloud is active and we're in a cloud folder
+    if (!isCloudActive || !cloudLastSync || !cloudLocalFolder) return null;
+
+    // Check if current path is within cloud folder
+    const currentPath = isLocal ? currentLocalPath : currentRemotePath;
+    const isInCloudFolder = isLocal
+      ? currentPath.startsWith(cloudLocalFolder) || currentPath === cloudLocalFolder
+      : true; // For remote, we assume if cloud is active, we show badges
+
+    if (!isInCloudFolder) return null;
+
+    const lastSyncTime = new Date(cloudLastSync).getTime();
+    const fileTime = fileModified ? new Date(fileModified).getTime() : 0;
+
+    // If syncing right now
+    if (cloudSyncing) {
+      return (
+        <span title="Syncing...">
+          <RefreshCw size={12} className="text-cyan-500 animate-spin ml-1" />
+        </span>
+      );
+    }
+
+    // If file modified after last sync -> pending
+    if (fileTime > lastSyncTime) {
+      return (
+        <span title="Pending sync">
+          <RefreshCw size={12} className="text-yellow-500 ml-1" />
+        </span>
+      );
+    }
+
+    // Otherwise synced
+    return (
+      <span title="Synced">
+        <CheckCircle2 size={12} className="text-green-500 ml-1" />
+      </span>
+    );
+  };
 
   // Load image preview as base64 when file changes
   useEffect(() => {
@@ -411,10 +455,21 @@ const App: React.FC = () => {
     // Check initial cloud config
     const checkCloudConfig = async () => {
       try {
-        const config = await invoke<{ enabled: boolean; server_profile?: string }>('get_cloud_config');
+        const config = await invoke<{
+          enabled: boolean;
+          server_profile?: string;
+          last_sync?: string;
+          local_folder?: string;
+        }>('get_cloud_config');
         setIsCloudActive(config.enabled);
         if (config.server_profile) {
           setCloudServerName(config.server_profile);
+        }
+        if (config.last_sync) {
+          setCloudLastSync(config.last_sync);
+        }
+        if (config.local_folder) {
+          setCloudLocalFolder(config.local_folder);
         }
       } catch (e) {
         console.error('Failed to check cloud config:', e);
@@ -431,6 +486,8 @@ const App: React.FC = () => {
         // Sync completed, back to idle (active = enabled but not syncing)
         setCloudSyncing(false);
         setIsCloudActive(true);
+        // Refresh last_sync timestamp for badges
+        setCloudLastSync(new Date().toISOString());
       } else if (status === 'idle') {
         setCloudSyncing(false);
         setIsCloudActive(true);
@@ -1513,6 +1570,7 @@ const App: React.FC = () => {
                             <td className="px-4 py-2 flex items-center gap-2">
                               {file.is_dir ? <Folder size={16} className="text-yellow-500" /> : getFileIcon(file.name).icon}
                               {file.name}
+                              {getSyncBadge(file.path, file.modified || undefined, false)}
                             </td>
                             <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{file.size ? formatBytes(file.size) : '-'}</td>
                             <td className="px-3 py-2 text-xs text-gray-500 font-mono" title={file.permissions || undefined}>{file.permissions || '-'}</td>
@@ -1658,6 +1716,7 @@ const App: React.FC = () => {
                             <td className="px-4 py-2 flex items-center gap-2">
                               {file.is_dir ? <Folder size={16} className="text-yellow-500" /> : getFileIcon(file.name).icon}
                               {file.name}
+                              {getSyncBadge(file.path, file.modified || undefined, true)}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-500">{file.size !== null ? formatBytes(file.size) : '-'}</td>
                             <td className="px-4 py-2 text-xs text-gray-500">{formatDate(file.modified)}</td>
