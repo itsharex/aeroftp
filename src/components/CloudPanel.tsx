@@ -457,13 +457,17 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
     };
 
     const handleSyncNow = async () => {
-        console.log('Starting sync...', 'info');
+        console.log('Starting sync...');
+        setStatus({ type: 'syncing', current_file: 'Scanning...', progress: 0 });
         try {
-            // TODO: Invoke sync command
-            // For now, just update status
-            setStatus({ type: 'syncing', current_file: 'Scanning...', progress: 0 });
+            const result = await invoke<string>('trigger_cloud_sync');
+            console.log('Sync result:', result);
+            setStatus({ type: 'idle' });
+            // Reload config to update last_sync
+            loadConfig();
         } catch (error) {
-            console.log(`Sync failed: ${error}`, 'error');
+            console.error('Sync failed:', error);
+            setStatus({ type: 'error', message: String(error) });
         }
     };
 
