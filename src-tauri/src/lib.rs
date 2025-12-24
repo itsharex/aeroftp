@@ -1279,9 +1279,165 @@ async fn trigger_cloud_sync(state: tauri::State<'_, AppState>) -> Result<String,
 // ============ Background Sync & Tray Commands ============
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 // Global flag to control background sync
 static BACKGROUND_SYNC_RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// Background sync worker - runs in a separate tokio task
+/// Creates its own FTP connection to avoid conflicts with main UI
+async fn background_sync_worker(app: AppHandle) {
+    info!("Background sync worker started");
+    
+    loop {
+        // Check if we should stop
+        if !BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
+            info!("Background sync worker stopping (flag set to false)");
+            break;
+        }
+        
+        // Load fresh config each cycle
+        let config = cloud_config::load_cloud_config();
+        if !config.enabled {
+            info!("AeroCloud disabled, stopping background sync");
+            BACKGROUND_SYNC_RUNNING.store(false, Ordering::SeqCst);
+            let _ = app.emit("cloud-sync-status", serde_json::json!({
+                "status": "disabled",
+                "message": "AeroCloud is disabled"
+            }));
+            break;
+        }
+        
+        // Calculate sleep duration
+        let interval_secs = config.sync_interval_secs.max(60); // Minimum 60 seconds
+        
+        info!("Background sync: next sync in {}s", interval_secs);
+        
+        // Wait for interval (check cancel flag every 5 seconds)
+        let mut waited = 0u64;
+        while waited < interval_secs {
+            if !BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            waited += 5;
+        }
+        
+        // Final check before sync
+        if !BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
+            break;
+        }
+        
+        // Perform sync with dedicated FTP connection
+        info!("Background sync: starting sync cycle");
+        
+        // Emit syncing status
+        let _ = app.emit("cloud-sync-status", serde_json::json!({
+            "status": "syncing",
+            "message": "Syncing..."
+        }));
+        
+        match perform_background_sync(&config).await {
+            Ok(result) => {
+                info!("Background sync completed: {} uploaded, {} downloaded, {} errors",
+                    result.uploaded, result.downloaded, result.errors.len());
+                
+                // Emit success
+                let _ = app.emit("cloud-sync-status", serde_json::json!({
+                    "status": "active",
+                    "message": format!("Synced: ↑{} ↓{}", result.uploaded, result.downloaded)
+                }));
+                
+                // Emit sync complete event for UI
+                let _ = app.emit("cloud_sync_complete", &result);
+            }
+            Err(e) => {
+                warn!("Background sync failed: {}", e);
+                let _ = app.emit("cloud-sync-status", serde_json::json!({
+                    "status": "error",
+                    "message": format!("Sync failed: {}", e)
+                }));
+            }
+        }
+    }
+    
+    info!("Background sync worker exited");
+}
+
+/// Perform a sync cycle with a dedicated FTP connection
+/// This avoids conflicts with the main UI FTP connection
+async fn perform_background_sync(config: &cloud_config::CloudConfig) -> Result<cloud_service::SyncOperationResult, String> {
+    // Load saved server credentials
+    let server_profile = &config.server_profile;
+    
+    // Try to get server credentials from saved servers (localStorage sync)
+    // For now, we'll use a simple approach - the sync requires active main connection
+    // In the future, we could store encrypted credentials
+    
+    // Create dedicated FTP manager for background sync
+    let mut ftp_manager = ftp::FtpManager::new();
+    
+    // We need server credentials - check if we have them saved
+    // For MVP, background sync only works if the server is already connected in main UI
+    // and we use the same credentials from config file
+    
+    // Try to connect using saved credentials
+    let creds_path = dirs::config_dir()
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(".")))
+        .join("aeroftp")
+        .join("server_credentials.json");
+    
+    #[derive(serde::Deserialize)]
+    struct SavedCredentials {
+        server: String,
+        username: String,
+        password: String,
+    }
+    
+    // Try to load credentials for the profile
+    if let Ok(content) = tokio::fs::read_to_string(&creds_path).await {
+        if let Ok(creds_map) = serde_json::from_str::<std::collections::HashMap<String, SavedCredentials>>(&content) {
+            if let Some(creds) = creds_map.get(server_profile) {
+                // Connect to server
+                ftp_manager.connect(&creds.server)
+                    .await
+                    .map_err(|e| format!("Failed to connect for background sync: {}", e))?;
+                
+                // Login with credentials
+                ftp_manager.login(&creds.username, &creds.password)
+                    .await
+                    .map_err(|e| format!("Failed to login for background sync: {}", e))?;
+                    
+                info!("Background sync: connected to {} as {}", creds.server, creds.username);
+            } else {
+                return Err(format!("No saved credentials for profile: {}", server_profile));
+            }
+        } else {
+            return Err("Failed to parse saved credentials".to_string());
+        }
+    } else {
+        return Err("No saved credentials file. Background sync requires saved server credentials.".to_string());
+    }
+    
+    // Navigate to remote folder
+    if ftp_manager.change_dir(&config.remote_folder).await.is_err() {
+        // Try to create it
+        let _ = ftp_manager.mkdir(&config.remote_folder).await;
+        ftp_manager.change_dir(&config.remote_folder).await
+            .map_err(|e| format!("Failed to navigate to remote folder: {}", e))?;
+    }
+    
+    // Create cloud service and perform sync
+    let cloud_service = cloud_service::CloudService::new();
+    cloud_service.init(config.clone()).await;
+    
+    let result = cloud_service.perform_full_sync(&mut ftp_manager).await?;
+    
+    // Disconnect
+    let _ = ftp_manager.disconnect().await;
+    
+    Ok(result)
+}
 
 #[tauri::command]
 async fn start_background_sync(
@@ -1297,9 +1453,18 @@ async fn start_background_sync(
         return Err("AeroCloud not configured".to_string());
     }
 
+    // Set flag before spawning
     BACKGROUND_SYNC_RUNNING.store(true, Ordering::SeqCst);
     
-    // Update tray tooltip to show sync is active
+    // Clone app handle for the spawned task
+    let app_clone = app.clone();
+    
+    // Spawn background worker
+    tokio::spawn(async move {
+        background_sync_worker(app_clone).await;
+    });
+    
+    // Emit status
     let _ = app.emit("cloud-sync-status", serde_json::json!({
         "status": "active",
         "message": "Background sync started"
@@ -1318,7 +1483,7 @@ async fn stop_background_sync(app: AppHandle) -> Result<String, String> {
 
     BACKGROUND_SYNC_RUNNING.store(false, Ordering::SeqCst);
     
-    // Update tray to show sync stopped
+    // Emit status
     let _ = app.emit("cloud-sync-status", serde_json::json!({
         "status": "idle",
         "message": "Background sync stopped"
@@ -1336,13 +1501,57 @@ fn is_background_sync_running() -> bool {
 
 #[tauri::command]
 async fn set_tray_status(app: AppHandle, status: String, tooltip: Option<String>) -> Result<(), String> {
-    // Emit event that frontend can use to update UI state
     let _ = app.emit("tray-status-update", serde_json::json!({
         "status": status,
         "tooltip": tooltip.unwrap_or_else(|| "AeroCloud".to_string())
     }));
     
     info!("Tray status updated: {}", status);
+    Ok(())
+}
+
+/// Save server credentials for background sync use
+#[tauri::command]
+async fn save_server_credentials(
+    profile_name: String,
+    server: String,
+    username: String,
+    password: String,
+) -> Result<(), String> {
+    let creds_path = dirs::config_dir()
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(".")))
+        .join("aeroftp")
+        .join("server_credentials.json");
+    
+    // Load existing credentials
+    let mut creds_map: std::collections::HashMap<String, serde_json::Value> = 
+        if let Ok(content) = tokio::fs::read_to_string(&creds_path).await {
+            serde_json::from_str(&content).unwrap_or_default()
+        } else {
+            std::collections::HashMap::new()
+        };
+    
+    // Add/update credentials
+    creds_map.insert(profile_name.clone(), serde_json::json!({
+        "server": server,
+        "username": username,
+        "password": password
+    }));
+    
+    // Ensure directory exists
+    if let Some(parent) = creds_path.parent() {
+        tokio::fs::create_dir_all(parent).await
+            .map_err(|e| format!("Failed to create config dir: {}", e))?;
+    }
+    
+    // Save
+    let content = serde_json::to_string_pretty(&creds_map)
+        .map_err(|e| format!("Failed to serialize credentials: {}", e))?;
+    
+    tokio::fs::write(&creds_path, content).await
+        .map_err(|e| format!("Failed to save credentials: {}", e))?;
+    
+    info!("Saved credentials for profile: {}", profile_name);
     Ok(())
 }
 
@@ -1562,6 +1771,7 @@ pub fn run() {
             stop_background_sync,
             is_background_sync_running,
             set_tray_status,
+            save_server_credentials,
             // AI commands
             ai_chat,
             ai_test_provider,

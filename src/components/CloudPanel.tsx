@@ -57,7 +57,7 @@ interface CloudPanelProps {
 
 // Setup Wizard Component
 const SetupWizard: React.FC<{
-    savedServers: { name: string; host: string; initialPath?: string }[];
+    savedServers: { name: string; host: string; port?: number; username?: string; password?: string; initialPath?: string }[];
     onComplete: (config: CloudConfig) => void;
     onCancel: () => void;
 }> = ({ savedServers, onComplete, onCancel }) => {
@@ -88,6 +88,23 @@ const SetupWizard: React.FC<{
     const handleComplete = async () => {
         setIsLoading(true);
         try {
+            // First, save server credentials for background sync
+            const selectedServer = savedServers.find(s => s.name === serverProfile);
+            if (selectedServer && selectedServer.username && selectedServer.password) {
+                const serverString = selectedServer.port && selectedServer.port !== 21
+                    ? `${selectedServer.host}:${selectedServer.port}`
+                    : selectedServer.host;
+
+                await invoke('save_server_credentials', {
+                    profileName: serverProfile,
+                    server: serverString,
+                    username: selectedServer.username,
+                    password: selectedServer.password,
+                });
+                console.log('Server credentials saved for background sync');
+            }
+
+            // Then setup AeroCloud
             const config = await invoke<CloudConfig>('setup_aerocloud', {
                 localFolder,
                 remoteFolder,
@@ -409,15 +426,26 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
     } = useTraySync();
 
     // Load saved servers from localStorage (same key as SavedServers component)
+    // Include all credentials for background sync support
     const savedServers = React.useMemo(() => {
         try {
             const stored = localStorage.getItem('aeroftp-saved-servers');
             if (stored) {
                 const servers = JSON.parse(stored);
-                return servers.map((s: { name?: string; host: string; initialPath?: string }) => ({
+                return servers.map((s: {
+                    name?: string;
+                    host: string;
+                    port?: number;
+                    username?: string;
+                    password?: string;
+                    initialPath?: string;
+                }) => ({
                     name: s.name || s.host,
                     host: s.host,
-                    initialPath: s.initialPath || '' // Include initialPath!
+                    port: s.port || 21,
+                    username: s.username || '',
+                    password: s.password || '',
+                    initialPath: s.initialPath || ''
                 }));
             }
         } catch (e) {
