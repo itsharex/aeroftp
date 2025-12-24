@@ -503,7 +503,7 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
 
     if (isLoading) {
         return (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={onClose}>
+            <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center backdrop-blur-sm" onClick={onClose}>
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-3">
                         <Loader2 className="animate-spin" size={32} />
@@ -517,7 +517,7 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
     // Show setup wizard if not configured
     if (!config?.enabled) {
         return (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={onClose}>
+            <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center backdrop-blur-sm" onClick={onClose}>
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-semibold flex items-center gap-2"><Cloud className="text-cyan-500" /> AeroCloud Setup</h2>
@@ -535,7 +535,7 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
 
     // Show dashboard
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center backdrop-blur-sm" onClick={onClose}>
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-semibold flex items-center gap-2"><Cloud className="text-cyan-500" /> AeroCloud</h2>
