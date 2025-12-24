@@ -733,6 +733,13 @@ const App: React.FC = () => {
 
       toast.success('Connected', `Connected to AeroCloud (${cloudConfig.server_profile})`);
 
+      // Trigger a sync after connecting to cloud
+      try {
+        await invoke('trigger_cloud_sync');
+      } catch (e) {
+        console.log('Sync trigger skipped:', e);
+      }
+
     } catch (error) {
       toast.error('Connection Failed', String(error));
       setShowCloudPanel(true);
