@@ -1149,6 +1149,7 @@ fn save_cloud_config_cmd(config: CloudConfig) -> Result<(), String> {
 
 #[tauri::command]
 async fn setup_aerocloud(
+    cloud_name: String,
     local_folder: String,
     remote_folder: String,
     server_profile: String,
@@ -1157,6 +1158,7 @@ async fn setup_aerocloud(
 ) -> Result<CloudConfig, String> {
     let mut config = CloudConfig::default();
     config.enabled = true;
+    config.cloud_name = cloud_name;
     config.local_folder = std::path::PathBuf::from(&local_folder);
     config.remote_folder = remote_folder.clone();
     config.server_profile = server_profile;

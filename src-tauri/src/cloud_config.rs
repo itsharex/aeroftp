@@ -12,6 +12,9 @@ use std::path::PathBuf;
 pub struct CloudConfig {
     /// Is cloud sync enabled
     pub enabled: bool,
+    /// Custom display name for this cloud connection
+    #[serde(default)]
+    pub cloud_name: String,
     /// Local folder to sync (e.g., ~/Documents/AeroCloud)
     pub local_folder: PathBuf,
     /// Remote folder on FTP server (e.g., /cloud/)
@@ -63,6 +66,7 @@ impl Default for CloudConfig {
 
         Self {
             enabled: false,
+            cloud_name: String::new(),
             local_folder,
             remote_folder: "/cloud/".to_string(),
             server_profile: String::new(),

@@ -17,6 +17,7 @@ import './CloudPanel.css';
 // TypeScript interfaces matching Rust structs
 interface CloudConfig {
     enabled: boolean;
+    cloud_name: string;
     local_folder: string;
     remote_folder: string;
     server_profile: string;
@@ -62,6 +63,7 @@ const SetupWizard: React.FC<{
     onCancel: () => void;
 }> = ({ savedServers, onComplete, onCancel }) => {
     const [step, setStep] = useState(1);
+    const [cloudName, setCloudName] = useState('My Cloud');
     const [localFolder, setLocalFolder] = useState('');
     const [remoteFolder, setRemoteFolder] = useState('/cloud/');
     const [serverProfile, setServerProfile] = useState('');
@@ -106,6 +108,7 @@ const SetupWizard: React.FC<{
 
             // Then setup AeroCloud
             const config = await invoke<CloudConfig>('setup_aerocloud', {
+                cloudName,
                 localFolder,
                 remoteFolder,
                 serverProfile,
@@ -142,7 +145,18 @@ const SetupWizard: React.FC<{
             <div className="wizard-content">
                 {step === 1 && (
                     <div className="wizard-step">
-                        <h3><FolderOpen size={20} /> Local Folder</h3>
+                        <h3><Cloud size={20} /> Cloud Name</h3>
+                        <p>Give your cloud a personalized name.</p>
+                        <div className="folder-input">
+                            <input
+                                type="text"
+                                value={cloudName}
+                                onChange={(e) => setCloudName(e.target.value)}
+                                placeholder="My Cloud"
+                            />
+                        </div>
+
+                        <h3 className="mt-4"><FolderOpen size={20} /> Local Folder</h3>
                         <p>Choose where AeroCloud will sync files on your computer.</p>
                         <div className="folder-input">
                             <input
@@ -283,6 +297,36 @@ const CloudDashboard: React.FC<{
     onOpenFolder: () => void;
     onSettings: () => void;
 }> = ({ config, status, onSyncNow, onPause, onResume, onDisable, onOpenFolder, onSettings }) => {
+    const [countdown, setCountdown] = useState<string>('');
+
+    // Countdown timer effect
+    useEffect(() => {
+        if (!config.last_sync || status.type === 'syncing' || status.type === 'paused') {
+            setCountdown('');
+            return;
+        }
+
+        const updateCountdown = () => {
+            const lastSync = new Date(config.last_sync!).getTime();
+            const intervalMs = config.sync_interval_secs * 1000;
+            const nextSync = lastSync + intervalMs;
+            const now = Date.now();
+            const remainingMs = nextSync - now;
+
+            if (remainingMs <= 0) {
+                setCountdown('Soon...');
+            } else {
+                const mins = Math.floor(remainingMs / 60000);
+                const secs = Math.floor((remainingMs % 60000) / 1000);
+                setCountdown(`${mins}:${secs.toString().padStart(2, '0')}`);
+            }
+        };
+
+        updateCountdown();
+        const interval = setInterval(updateCountdown, 1000);
+        return () => clearInterval(interval);
+    }, [config.last_sync, config.sync_interval_secs, status.type]);
+
     const formatLastSync = (timestamp: string | null) => {
         if (!timestamp) return 'Never';
         const date = new Date(timestamp);
@@ -324,8 +368,11 @@ const CloudDashboard: React.FC<{
                     {getStatusIcon()}
                 </div>
                 <div className="status-info">
-                    <h2>AeroCloud</h2>
-                    <p className="status-text">{getStatusText()}</p>
+                    <h2>{config.cloud_name || 'AeroCloud'}</h2>
+                    <p className="status-text">
+                        {getStatusText()}
+                        {countdown && <span className="countdown"> • Next: {countdown}</span>}
+                    </p>
                 </div>
                 <button onClick={onSettings} className="btn-icon" title="Settings">
                     <Settings size={20} />
