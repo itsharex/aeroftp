@@ -1354,6 +1354,7 @@ const App: React.FC = () => {
                         <tr>
                           <SortableHeader label="Name" field="name" currentField={remoteSortField} order={remoteSortOrder} onClick={handleRemoteSort} />
                           <SortableHeader label="Size" field="size" currentField={remoteSortField} order={remoteSortOrder} onClick={handleRemoteSort} />
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">Perms</th>
                           <SortableHeader label="Modified" field="modified" currentField={remoteSortField} order={remoteSortOrder} onClick={handleRemoteSort} />
                         </tr>
                       </thead>
@@ -1368,8 +1369,9 @@ const App: React.FC = () => {
                               <FolderUp size={16} />
                               <span className="italic">Go up</span>
                             </td>
-                            <td className="px-4 py-2 text-sm text-gray-400">—</td>
-                            <td className="px-4 py-2 text-sm text-gray-400">—</td>
+                            <td className="px-4 py-2 text-xs text-gray-400">—</td>
+                            <td className="px-4 py-2 text-xs text-gray-400">—</td>
+                            <td className="px-4 py-2 text-xs text-gray-400">—</td>
                           </tr>
                         )}
                         {sortedRemoteFiles.map((file, i) => (
@@ -1399,8 +1401,9 @@ const App: React.FC = () => {
                               {file.is_dir ? <Folder size={16} className="text-yellow-500" /> : getFileIcon(file.name).icon}
                               {file.name}
                             </td>
-                            <td className="px-4 py-2 text-sm text-gray-500">{file.size ? formatBytes(file.size) : '-'}</td>
-                            <td className="px-4 py-2 text-sm text-gray-500">{file.modified || '-'}</td>
+                            <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{file.size ? formatBytes(file.size) : '-'}</td>
+                            <td className="px-3 py-2 text-xs text-gray-500 font-mono" title={file.permissions || undefined}>{file.permissions || '-'}</td>
+                            <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{formatDate(file.modified)}</td>
                           </tr>
                         ))}
                       </tbody>

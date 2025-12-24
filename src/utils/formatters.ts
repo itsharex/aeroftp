@@ -28,9 +28,23 @@ export const formatETA = (seconds: number): string => {
 };
 
 /**
- * Format date string from "2025-12-17 00:36" to "Dec 17 00:36"
+ * Format date string to full format: dd/mm/yyyy hh:mm:ss
+ * Input formats: "2025-12-17 00:36" or "2025-12-17 00:36:45"
  */
 export const formatDate = (dateStr: string | null): string => {
+    if (!dateStr) return '';
+    // Try to parse ISO-like format: YYYY-MM-DD HH:MM or YYYY-MM-DD HH:MM:SS
+    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (!match) return dateStr;
+    const [, year, month, day, hour, minute, second] = match;
+    const sec = second || '00';
+    return `${day}/${month}/${year} ${hour}:${minute}:${sec}`;
+};
+
+/**
+ * Format date string to compact format: Dec 17 00:36 (for space-constrained areas)
+ */
+export const formatDateCompact = (dateStr: string | null): string => {
     if (!dateStr) return '';
     const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/);
     if (!match) return dateStr;
