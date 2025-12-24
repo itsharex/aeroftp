@@ -9,8 +9,9 @@ import {
     Cloud, CloudOff, CloudUpload, CloudDownload, RefreshCw,
     Folder, FolderOpen, Settings, Play, Pause, Check, X,
     AlertCircle, Clock, HardDrive, Server, ChevronRight,
-    Loader2, Zap, Shield, History
+    Loader2, Zap, Shield, History, Radio
 } from 'lucide-react';
+import { useTraySync } from '../hooks/useTraySync';
 import './CloudPanel.css';
 
 // TypeScript interfaces matching Rust structs
@@ -398,6 +399,15 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [showSettings, setShowSettings] = useState(false);
 
+    // Use modular tray sync hook
+    const {
+        trayState,
+        isRunning: isBackgroundSyncRunning,
+        startBackgroundSync,
+        stopBackgroundSync,
+        toggleBackgroundSync
+    } = useTraySync();
+
     // Load saved servers from localStorage (same key as SavedServers component)
     const savedServers = React.useMemo(() => {
         try {
@@ -473,6 +483,10 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
         console.log('Starting sync...');
         setStatus({ type: 'syncing', current_file: 'Scanning...', progress: 0 });
         try {
+            // Start background sync if not already running
+            if (!isBackgroundSyncRunning) {
+                await startBackgroundSync();
+            }
             const result = await invoke<string>('trigger_cloud_sync');
             console.log('Sync result:', result);
             setStatus({ type: 'idle' });
@@ -485,13 +499,23 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
     };
 
     const handlePause = async () => {
-        setStatus({ type: 'paused' });
-        console.log('Sync paused', 'info');
+        try {
+            await stopBackgroundSync();
+            setStatus({ type: 'paused' });
+            console.log('Sync paused', 'info');
+        } catch (error) {
+            console.error('Failed to pause sync:', error);
+        }
     };
 
     const handleResume = async () => {
-        setStatus({ type: 'idle', last_sync: config?.last_sync || undefined });
-        console.log('Sync resumed', 'info');
+        try {
+            await startBackgroundSync();
+            setStatus({ type: 'idle', last_sync: config?.last_sync || undefined });
+            console.log('Sync resumed', 'info');
+        } catch (error) {
+            console.error('Failed to resume sync:', error);
+        }
     };
 
     const handleDisable = async () => {

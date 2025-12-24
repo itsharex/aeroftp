@@ -1276,6 +1276,76 @@ async fn trigger_cloud_sync(state: tauri::State<'_, AppState>) -> Result<String,
         }
     }
 }
+// ============ Background Sync & Tray Commands ============
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+// Global flag to control background sync
+static BACKGROUND_SYNC_RUNNING: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+async fn start_background_sync(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    if BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
+        return Ok("Background sync already running".to_string());
+    }
+
+    let config = cloud_config::load_cloud_config();
+    if !config.enabled {
+        return Err("AeroCloud not configured".to_string());
+    }
+
+    BACKGROUND_SYNC_RUNNING.store(true, Ordering::SeqCst);
+    
+    // Update tray tooltip to show sync is active
+    let _ = app.emit("cloud-sync-status", serde_json::json!({
+        "status": "active",
+        "message": "Background sync started"
+    }));
+
+    info!("Background sync started with interval: {}s", config.sync_interval_secs);
+    
+    Ok(format!("Background sync started (interval: {}s)", config.sync_interval_secs))
+}
+
+#[tauri::command]
+async fn stop_background_sync(app: AppHandle) -> Result<String, String> {
+    if !BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
+        return Ok("Background sync not running".to_string());
+    }
+
+    BACKGROUND_SYNC_RUNNING.store(false, Ordering::SeqCst);
+    
+    // Update tray to show sync stopped
+    let _ = app.emit("cloud-sync-status", serde_json::json!({
+        "status": "idle",
+        "message": "Background sync stopped"
+    }));
+
+    info!("Background sync stopped");
+    
+    Ok("Background sync stopped".to_string())
+}
+
+#[tauri::command]
+fn is_background_sync_running() -> bool {
+    BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst)
+}
+
+#[tauri::command]
+async fn set_tray_status(app: AppHandle, status: String, tooltip: Option<String>) -> Result<(), String> {
+    // Emit event that frontend can use to update UI state
+    let _ = app.emit("tray-status-update", serde_json::json!({
+        "status": status,
+        "tooltip": tooltip.unwrap_or_else(|| "AeroCloud".to_string())
+    }));
+    
+    info!("Tray status updated: {}", status);
+    Ok(())
+}
 
 // ============ App Entry Point ============
 
@@ -1420,6 +1490,11 @@ pub fn run() {
             get_default_cloud_folder,
             update_conflict_strategy,
             trigger_cloud_sync,
+            // Background sync & tray commands
+            start_background_sync,
+            stop_background_sync,
+            is_background_sync_running,
+            set_tray_status,
             // AI commands
             ai_chat,
             ai_test_provider,
