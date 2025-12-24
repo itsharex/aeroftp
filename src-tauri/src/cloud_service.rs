@@ -409,19 +409,33 @@ impl CloudService {
         // Execute action
         match &action {
             SyncAction::Upload => {
-                if !comparison.is_dir {
-                    if let Some(local_info) = &comparison.local_info {
-                        let remote_path = format!(
+                let remote_path = format!(
+                    "{}/{}",
+                    config.remote_folder.trim_end_matches('/'),
+                    comparison.relative_path
+                );
+                
+                if comparison.is_dir {
+                    // Create remote directory
+                    if let Err(e) = ftp_manager.mkdir(&remote_path).await {
+                        // Directory might already exist, log but don't fail
+                        tracing::debug!("mkdir {} (may exist): {}", remote_path, e);
+                    }
+                } else if let Some(local_info) = &comparison.local_info {
+                    // Ensure parent directory exists on remote
+                    if let Some(parent) = std::path::Path::new(&comparison.relative_path).parent() {
+                        let parent_path = format!(
                             "{}/{}",
                             config.remote_folder.trim_end_matches('/'),
-                            comparison.relative_path
+                            parent.to_string_lossy()
                         );
-                        
-                        ftp_manager
-                            .upload_file_with_progress(&local_info.path, &remote_path, local_info.size, |_| {})
-                            .await
-                            .map_err(|e| format!("Upload failed: {}", e))?;
+                        let _ = ftp_manager.mkdir(&parent_path).await;
                     }
+                    
+                    ftp_manager
+                        .upload_file_with_progress(&local_info.path, &remote_path, local_info.size, |_| {})
+                        .await
+                        .map_err(|e| format!("Upload failed: {}", e))?;
                 }
             }
             SyncAction::Download => {

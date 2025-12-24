@@ -1289,6 +1289,9 @@ static BACKGROUND_SYNC_RUNNING: AtomicBool = AtomicBool::new(false);
 async fn background_sync_worker(app: AppHandle) {
     info!("Background sync worker started");
     
+    // Run first sync immediately, then loop with intervals
+    let mut is_first_run = true;
+    
     loop {
         // Check if we should stop
         if !BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
@@ -1308,25 +1311,28 @@ async fn background_sync_worker(app: AppHandle) {
             break;
         }
         
-        // Calculate sleep duration
-        let interval_secs = config.sync_interval_secs.max(60); // Minimum 60 seconds
-        
-        info!("Background sync: next sync in {}s", interval_secs);
-        
-        // Wait for interval (check cancel flag every 5 seconds)
-        let mut waited = 0u64;
-        while waited < interval_secs {
+        // On first run, sync immediately. On subsequent runs, wait for interval first.
+        if !is_first_run {
+            let interval_secs = config.sync_interval_secs.max(30); // Minimum 30 seconds for testing
+            info!("Background sync: next sync in {}s", interval_secs);
+            
+            // Wait for interval (check cancel flag every 5 seconds)
+            let mut waited = 0u64;
+            while waited < interval_secs {
+                if !BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
+                    info!("Background sync cancelled during wait");
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                waited += 5;
+            }
+            
+            // Check again after waiting
             if !BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
                 break;
             }
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            waited += 5;
         }
-        
-        // Final check before sync
-        if !BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
-            break;
-        }
+        is_first_run = false;
         
         // Perform sync with dedicated FTP connection
         info!("Background sync: starting sync cycle");
@@ -1357,6 +1363,9 @@ async fn background_sync_worker(app: AppHandle) {
                     "status": "error",
                     "message": format!("Sync failed: {}", e)
                 }));
+                
+                // On error, wait a bit before retrying to avoid spamming
+                tokio::time::sleep(Duration::from_secs(30)).await;
             }
         }
     }
@@ -1719,6 +1728,19 @@ pub fn run() {
             info!("Menu event: {}", id);
             // Emit event to frontend
             let _ = app.emit("menu-event", id);
+        })
+        .on_window_event(|window, event| {
+            // Hide window instead of closing when cloud sync may be active
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Check if background sync is running
+                if BACKGROUND_SYNC_RUNNING.load(Ordering::SeqCst) {
+                    info!("Window close requested, hiding to tray (background sync active)");
+                    let _ = window.hide();
+                    api.prevent_close();
+                } else {
+                    info!("Window close requested, no background sync, exiting");
+                }
+            }
         })
         .manage(AppState::new());
 

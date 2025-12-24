@@ -392,7 +392,11 @@ const CloudDashboard: React.FC<{
                         <Play size={16} /> Resume
                     </button>
                 ) : (
-                    <button onClick={onPause} className="btn-secondary" disabled={status.type !== 'idle'}>
+                    <button
+                        onClick={onPause}
+                        className="btn-secondary"
+                        disabled={status.type === 'not_configured' || status.type === 'error'}
+                    >
                         <Pause size={16} /> Pause
                     </button>
                 )}

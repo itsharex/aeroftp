@@ -430,15 +430,55 @@ const App: React.FC = () => {
         setIsCloudActive(true);
       } else if (status === 'idle') {
         setCloudSyncing(false);
+      } else if (status === 'syncing') {
+        setCloudSyncing(true);
       } else if (status === 'error') {
         setCloudSyncing(false);
+        console.error('Cloud sync error:', message);
       } else if (status === 'disabled') {
         setCloudSyncing(false);
         setIsCloudActive(false);
       }
     });
 
-    return () => { unlistenStatus.then(fn => fn()); };
+    // Listen for tray menu events
+    const unlistenMenu = listen<string>('menu-event', async (event) => {
+      const action = event.payload;
+      console.log('Tray menu action:', action);
+
+      if (action === 'cloud_sync_now') {
+        // Trigger manual sync
+        try {
+          await invoke('trigger_cloud_sync');
+          console.log('Cloud sync triggered from tray');
+        } catch (e) {
+          console.error('Failed to trigger sync:', e);
+        }
+      } else if (action === 'cloud_pause') {
+        // Stop background sync
+        try {
+          await invoke('stop_background_sync');
+          console.log('Background sync paused from tray');
+        } catch (e) {
+          console.error('Failed to pause sync:', e);
+        }
+      } else if (action === 'cloud_open_folder') {
+        // Open cloud folder in file manager
+        try {
+          const config = await invoke<{ local_folder: string }>('get_cloud_config');
+          if (config.local_folder) {
+            await invoke('open_in_file_manager', { path: config.local_folder });
+          }
+        } catch (e) {
+          console.error('Failed to open cloud folder:', e);
+        }
+      }
+    });
+
+    return () => {
+      unlistenStatus.then(fn => fn());
+      unlistenMenu.then(fn => fn());
+    };
   }, []);
 
   // FTP operations
