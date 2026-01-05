@@ -63,8 +63,9 @@ const SetupWizard: React.FC<{
     onComplete: (config: CloudConfig) => void;
     onCancel: () => void;
 }> = ({ savedServers, onComplete, onCancel }) => {
+    const t = useTranslation();
     const [step, setStep] = useState(1);
-    const [cloudName, setCloudName] = useState('My Cloud');
+    const [cloudName, setCloudName] = useState(t('cloud.cloudNamePlaceholder'));
     const [localFolder, setLocalFolder] = useState('');
     const [remoteFolder, setRemoteFolder] = useState('/cloud/');
     const [serverProfile, setServerProfile] = useState('');
@@ -128,8 +129,8 @@ const SetupWizard: React.FC<{
         <div className="cloud-wizard">
             <div className="wizard-header">
                 <Cloud size={48} className="wizard-icon" />
-                <h2>AeroCloud</h2>
-                <p>Create Your Personal Cloud</p>
+                <h2>{t('cloud.title')}</h2>
+                <p>{t('cloud.setup')}</p>
             </div>
 
             <div className="wizard-progress">
@@ -146,29 +147,29 @@ const SetupWizard: React.FC<{
             <div className="wizard-content">
                 {step === 1 && (
                     <div className="wizard-step">
-                        <h3><Cloud size={20} /> Cloud Name</h3>
-                        <p>Give your cloud a personalized name.</p>
+                        <h3><Cloud size={20} /> {t('cloud.cloudName')}</h3>
+                        <p>{t('cloud.stepFolder')}</p>
                         <div className="folder-input">
                             <input
                                 type="text"
                                 value={cloudName}
                                 onChange={(e) => setCloudName(e.target.value)}
-                                placeholder="My Cloud"
+                                placeholder={t('cloud.cloudNamePlaceholder')}
                             />
                         </div>
 
-                        <h3 className="mt-4"><FolderOpen size={20} /> Local Folder</h3>
-                        <p>Choose where AeroCloud will sync files on your computer.</p>
+                        <h3 className="mt-4"><FolderOpen size={20} /> {t('cloud.localFolder')}</h3>
+                        <p>{t('cloud.stepFolder')}</p>
                         <div className="folder-input">
                             <input
                                 type="text"
                                 value={localFolder}
                                 onChange={(e) => setLocalFolder(e.target.value)}
-                                placeholder="Select folder..."
+                                placeholder={`${t('common.select')}...`}
                                 readOnly
                             />
                             <button onClick={selectLocalFolder} className="browse-btn">
-                                <Folder size={16} /> Browse
+                                <Folder size={16} /> {t('common.browse')}
                             </button>
                         </div>
                     </div>
@@ -176,8 +177,8 @@ const SetupWizard: React.FC<{
 
                 {step === 2 && (
                     <div className="wizard-step">
-                        <h3><Server size={20} /> Remote Folder</h3>
-                        <p>Choose the folder on your FTP server to sync with.</p>
+                        <h3><Server size={20} /> {t('cloud.remoteFolder')}</h3>
+                        <p>{t('cloud.stepServer')}</p>
                         <div className="folder-input">
                             <input
                                 type="text"
@@ -187,7 +188,7 @@ const SetupWizard: React.FC<{
                             />
                         </div>
                         <div className="server-select">
-                            <label>Server Profile:</label>
+                            <label>{t('cloud.serverProfile')}:</label>
                             <select
                                 value={serverProfile}
                                 onChange={(e) => {
@@ -204,7 +205,7 @@ const SetupWizard: React.FC<{
                                     }
                                 }}
                             >
-                                <option value="">Select a saved server...</option>
+                                <option value="">{t('cloud.selectServer')}</option>
                                 {savedServers.map((server) => (
                                     <option key={server.name} value={server.name}>
                                         {server.name} ({server.host})
@@ -217,7 +218,7 @@ const SetupWizard: React.FC<{
 
                 {step === 3 && (
                     <div className="wizard-step">
-                        <h3><Settings size={20} /> Sync Settings</h3>
+                        <h3><Settings size={20} /> {t('cloud.stepSettings')}</h3>
                         <div className="settings-options">
                             <label className="checkbox-option">
                                 <input
@@ -226,12 +227,12 @@ const SetupWizard: React.FC<{
                                     onChange={(e) => setSyncOnChange(e.target.checked)}
                                 />
                                 <Zap size={16} />
-                                <span>Sync on file change (real-time)</span>
+                                <span>{t('cloud.syncOnChange')}</span>
                             </label>
 
                             <div className="interval-option">
                                 <Clock size={16} />
-                                <span>Also sync every</span>
+                                <span>{t('cloud.syncInterval')}</span>
                                 <input
                                     type="number"
                                     min="1"
@@ -239,15 +240,15 @@ const SetupWizard: React.FC<{
                                     value={syncInterval}
                                     onChange={(e) => setSyncInterval(parseInt(e.target.value) || 5)}
                                 />
-                                <span>minutes</span>
+                                <span>{t('settings.minutes')}</span>
                             </div>
                         </div>
 
                         <div className="summary-box">
                             <h4>Summary</h4>
-                            <p><Folder size={14} /> Local: <code>{localFolder}</code></p>
-                            <p><Server size={14} /> Remote: <code>{remoteFolder}</code></p>
-                            <p><Shield size={14} /> Server: <code>{serverProfile || 'Not selected'}</code></p>
+                            <p><Folder size={14} /> {t('cloud.localFolder')}: <code>{localFolder}</code></p>
+                            <p><Server size={14} /> {t('cloud.remoteFolder')}: <code>{remoteFolder}</code></p>
+                            <p><Shield size={14} /> {t('cloud.serverProfile')}: <code>{serverProfile || t('cloud.never')}</code></p>
                         </div>
                     </div>
                 )}
@@ -255,12 +256,12 @@ const SetupWizard: React.FC<{
 
             <div className="wizard-footer">
                 <button onClick={onCancel} className="btn-secondary">
-                    Cancel
+                    {t('common.cancel')}
                 </button>
                 <div className="wizard-nav">
                     {step > 1 && (
                         <button onClick={() => setStep(step - 1)} className="btn-secondary">
-                            Back
+                            {t('common.back')}
                         </button>
                     )}
                     {step < 3 ? (
@@ -269,7 +270,7 @@ const SetupWizard: React.FC<{
                             className="btn-primary"
                             disabled={step === 1 && !localFolder || step === 2 && !serverProfile}
                         >
-                            Next <ChevronRight size={16} />
+                            {t('common.next')} <ChevronRight size={16} />
                         </button>
                     ) : (
                         <button
@@ -278,7 +279,7 @@ const SetupWizard: React.FC<{
                             disabled={isLoading || !localFolder || !serverProfile}
                         >
                             {isLoading ? <Loader2 className="spin" size={16} /> : <Cloud size={16} />}
-                            Enable AeroCloud
+                            {t('cloud.enableCloud')}
                         </button>
                     )}
                 </div>
@@ -298,6 +299,7 @@ const CloudDashboard: React.FC<{
     onOpenFolder: () => void;
     onSettings: () => void;
 }> = ({ config, status, onSyncNow, onPause, onResume, onDisable, onOpenFolder, onSettings }) => {
+    const t = useTranslation();
     const [countdown, setCountdown] = useState<string>('');
 
     // Countdown timer effect
@@ -329,13 +331,13 @@ const CloudDashboard: React.FC<{
     }, [config.last_sync, config.sync_interval_secs, status.type]);
 
     const formatLastSync = (timestamp: string | null) => {
-        if (!timestamp) return 'Never';
+        if (!timestamp) return t('cloud.never');
         const date = new Date(timestamp);
         const now = new Date();
         const diffMs = now.getTime() - date.getTime();
         const diffMins = Math.floor(diffMs / 60000);
 
-        if (diffMins < 1) return 'Just now';
+        if (diffMins < 1) return t('cloud.justNow');
         if (diffMins < 60) return `${diffMins}m ago`;
         if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
         return date.toLocaleDateString();
@@ -354,11 +356,11 @@ const CloudDashboard: React.FC<{
     const getStatusText = () => {
         switch (status.type) {
             case 'syncing':
-                return `Syncing: ${status.current_file || 'Starting...'} (${status.progress?.toFixed(0) || 0}%)`;
-            case 'paused': return 'Sync paused';
-            case 'has_conflicts': return `${status.count} conflicts need attention`;
-            case 'error': return status.message || 'Sync error';
-            default: return `Synced ${formatLastSync(config.last_sync)}`;
+                return `${t('cloud.syncing')}: ${status.current_file || t('cloud.starting')} (${status.progress?.toFixed(0) || 0}%)`;
+            case 'paused': return t('cloud.paused');
+            case 'has_conflicts': return `${status.count} ${t('cloud.conflicts')}`;
+            case 'error': return status.message || t('cloud.error');
+            default: return `${t('cloud.synced')} ${formatLastSync(config.last_sync)}`;
         }
     };
 
@@ -369,13 +371,13 @@ const CloudDashboard: React.FC<{
                     {getStatusIcon()}
                 </div>
                 <div className="status-info">
-                    <h2>{config.cloud_name || 'AeroCloud'}</h2>
+                    <h2>{config.cloud_name || t('cloud.title')}</h2>
                     <p className="status-text">
                         {getStatusText()}
-                        {countdown && <span className="countdown"> • Next: {countdown}</span>}
+                        {countdown && <span className="countdown"> • {t('common.next')}: {countdown}</span>}
                     </p>
                 </div>
-                <button onClick={onSettings} className="btn-icon" title="Settings">
+                <button onClick={onSettings} className="btn-icon" title={t('common.settings')}>
                     <Settings size={20} />
                 </button>
             </div>
@@ -396,7 +398,7 @@ const CloudDashboard: React.FC<{
                 <div className="info-card">
                     <Folder size={20} />
                     <div>
-                        <span className="label">Local Folder</span>
+                        <span className="label">{t('cloud.localFolder')}</span>
                         <span className="value">{config.local_folder}</span>
                     </div>
                 </div>
@@ -404,7 +406,7 @@ const CloudDashboard: React.FC<{
                 <div className="info-card">
                     <Server size={20} />
                     <div>
-                        <span className="label">Remote Folder</span>
+                        <span className="label">{t('cloud.remoteFolder')}</span>
                         <span className="value">{config.remote_folder}</span>
                     </div>
                 </div>
@@ -412,7 +414,7 @@ const CloudDashboard: React.FC<{
                 <div className="info-card">
                     <Shield size={20} />
                     <div>
-                        <span className="label">Server</span>
+                        <span className="label">{t('cloud.serverProfile')}</span>
                         <span className="value">{config.server_profile}</span>
                     </div>
                 </div>
@@ -420,7 +422,7 @@ const CloudDashboard: React.FC<{
                 <div className="info-card">
                     <History size={20} />
                     <div>
-                        <span className="label">Last Sync</span>
+                        <span className="label">{t('cloud.lastSync')}</span>
                         <span className="value">{formatLastSync(config.last_sync)}</span>
                     </div>
                 </div>
@@ -428,8 +430,8 @@ const CloudDashboard: React.FC<{
                 <div className="info-card">
                     <Clock size={20} />
                     <div>
-                        <span className="label">Sync Interval</span>
-                        <span className="value">{Math.round(config.sync_interval_secs / 60)} min</span>
+                        <span className="label">{t('cloud.syncInterval')}</span>
+                        <span className="value">{Math.round(config.sync_interval_secs / 60)} {t('settings.minutes')}</span>
                     </div>
                 </div>
             </div>
@@ -440,12 +442,12 @@ const CloudDashboard: React.FC<{
                     className="btn-primary"
                     disabled={status.type === 'syncing'}
                 >
-                    <RefreshCw size={16} /> Sync Now
+                    <RefreshCw size={16} /> {t('cloud.syncNow')}
                 </button>
 
                 {status.type === 'paused' ? (
                     <button onClick={onResume} className="btn-secondary">
-                        <Play size={16} /> Resume
+                        <Play size={16} /> {t('cloud.resume')}
                     </button>
                 ) : (
                     <button
@@ -453,16 +455,16 @@ const CloudDashboard: React.FC<{
                         className="btn-secondary"
                         disabled={status.type === 'not_configured' || status.type === 'error'}
                     >
-                        <Pause size={16} /> Pause
+                        <Pause size={16} /> {t('cloud.pause')}
                     </button>
                 )}
 
                 <button onClick={onOpenFolder} className="btn-secondary">
-                    <FolderOpen size={16} /> Open Folder
+                    <FolderOpen size={16} /> {t('cloud.openFolder')}
                 </button>
 
                 <button onClick={onDisable} className="btn-danger">
-                    <CloudOff size={16} /> Disable
+                    <CloudOff size={16} /> {t('cloud.disable')}
                 </button>
             </div>
         </div>
@@ -471,6 +473,7 @@ const CloudDashboard: React.FC<{
 
 // Main CloudPanel Component
 export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
+    const t = useTranslation();
     const [config, setConfig] = useState<CloudConfig | null>(null);
     const [status, setStatus] = useState<CloudSyncStatus>({ type: 'not_configured' });
     const [isLoading, setIsLoading] = useState(true);
@@ -641,7 +644,7 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-3">
                         <Loader2 className="animate-spin" size={32} />
-                        <p>Loading AeroCloud...</p>
+                        <p>{t('common.loading')} {t('cloud.title')}...</p>
                     </div>
                 </div>
             </div>
@@ -654,7 +657,7 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
             <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center backdrop-blur-sm" onClick={onClose}>
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-semibold flex items-center gap-2"><Cloud className="text-cyan-500" /> AeroCloud Setup</h2>
+                        <h2 className="text-xl font-semibold flex items-center gap-2"><Cloud className="text-cyan-500" /> {t('cloud.title')} {t('cloud.setup')}</h2>
                         <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X size={20} /></button>
                     </div>
                     <SetupWizard
@@ -673,13 +676,13 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
             <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center backdrop-blur-sm" onClick={onClose}>
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-semibold flex items-center gap-2"><Settings className="text-cyan-500" /> AeroCloud Settings</h2>
+                        <h2 className="text-xl font-semibold flex items-center gap-2"><Settings className="text-cyan-500" /> {t('cloud.title')} {t('common.settings')}</h2>
                         <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X size={20} /></button>
                     </div>
 
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1">Local Folder</label>
+                            <label className="block text-sm font-medium mb-1">{t('cloud.localFolder')}</label>
                             <input
                                 type="text"
                                 value={config?.local_folder || ''}
@@ -689,7 +692,7 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Remote Folder</label>
+                            <label className="block text-sm font-medium mb-1">{t('cloud.remoteFolder')}</label>
                             <input
                                 type="text"
                                 value={config?.remote_folder || '/cloud/'}
@@ -700,7 +703,7 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Server Profile</label>
+                            <label className="block text-sm font-medium mb-1">{t('cloud.serverProfile')}</label>
                             <input
                                 type="text"
                                 value={config?.server_profile || ''}
@@ -710,7 +713,7 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Sync Interval</label>
+                            <label className="block text-sm font-medium mb-1">{t('cloud.syncInterval')}</label>
                             <div className="flex items-center gap-2">
                                 <input
                                     type="number"
@@ -723,9 +726,9 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
                                     } : null)}
                                     className="w-20 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-center"
                                 />
-                                <span className="text-sm text-gray-500 dark:text-gray-400">minutes</span>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">{t('settings.minutes')}</span>
                             </div>
-                            <p className="text-xs text-gray-400 mt-1">How often to sync files in the background</p>
+                            <p className="text-xs text-gray-400 mt-1">{t('cloud.syncIntervalDesc')}</p>
                         </div>
 
                         <div className="flex gap-3 pt-4">
@@ -743,13 +746,13 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
                                 }}
                                 className="flex-1 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-medium"
                             >
-                                Save Settings
+                                {t('common.save')} {t('common.settings')}
                             </button>
                             <button
                                 onClick={() => setShowSettings(false)}
                                 className="flex-1 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium"
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                         </div>
                     </div>
@@ -763,7 +766,7 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
         <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center backdrop-blur-sm" onClick={onClose}>
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold flex items-center gap-2"><Cloud className="text-cyan-500" /> AeroCloud</h2>
+                    <h2 className="text-xl font-semibold flex items-center gap-2"><Cloud className="text-cyan-500" /> {t('cloud.title')}</h2>
                     <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X size={20} /></button>
                 </div>
                 <CloudDashboard
