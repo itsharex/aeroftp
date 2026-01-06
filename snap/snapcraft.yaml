@@ -1,20 +1,23 @@
 name: aeroftp
-version: '0.5.6'
+version: '0.9.0'
 summary: Fast, Beautiful, Reliable FTP Client built with Tauri
 description: |
-  AeroFTP is a modern FTP client that combines beauty and functionality.
+  AeroFTP is a modern, open-source FTP client that combines beauty and functionality.
   
   **Features:**
+  - 🌍 Multi-language support (i18n) - English, Italian
   - 🚀 Fast transfers with real-time progress
+  - ☁️ AeroCloud file synchronization
   - 🎨 Beautiful, modern dark/light themes
   - 📁 Dual-pane file browser (local & remote)
   - 🔄 File synchronization with conflict detection
   - 💻 Integrated DevTools (Code Editor, Terminal, AI Chat)
   - 📜 Multi-session tabs with connection caching
-  - 🔐 Secure connection profiles
+  - 🔐 Secure FTPS connection profiles
   - ⌨️ Keyboard shortcuts for power users
   
   Built with Rust (Tauri) and React/TypeScript for maximum performance.
+  Open source under GPL-3.0 license.
 
 base: core22
 grade: stable
