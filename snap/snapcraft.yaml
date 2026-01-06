@@ -19,7 +19,7 @@ description: |
   Built with Rust (Tauri) and React/TypeScript for maximum performance.
   Open source under GPL-3.0 license.
 
-base: core22
+base: core24
 grade: stable
 confinement: strict
 compression: lzo
@@ -30,15 +30,15 @@ source-code: https://github.com/axpnet/aeroftp
 website: https://github.com/axpnet/aeroftp
 license: GPL-3.0
 
-architectures:
-  - build-on: amd64
+platforms:
+  amd64:
 
 icon: icons/AeroFTP_simbol_color_512x512.png
 
 apps:
   aeroftp:
     command: usr/bin/aeroftp
-    desktop: snap/gui/aeroftp.desktop
+
     plugs:
       - home
       - network
