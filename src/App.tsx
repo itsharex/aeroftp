@@ -82,6 +82,8 @@ const App: React.FC = () => {
   const [localSortOrder, setLocalSortOrder] = useState<SortOrder>('asc');
   const [selectedLocalFiles, setSelectedLocalFiles] = useState<Set<string>>(new Set());
   const [selectedRemoteFiles, setSelectedRemoteFiles] = useState<Set<string>>(new Set());
+  const [lastSelectedRemoteIndex, setLastSelectedRemoteIndex] = useState<number | null>(null);
+  const [lastSelectedLocalIndex, setLastSelectedLocalIndex] = useState<number | null>(null);
   const [permissionsDialog, setPermissionsDialog] = useState<{ file: RemoteFile, visible: boolean } | null>(null);
 
   // Dialogs
@@ -1622,15 +1624,25 @@ const App: React.FC = () => {
                             key={file.name}
                             onClick={(e) => {
                               if (file.name === '..') return;
-                              if (e.ctrlKey || e.metaKey) {
+                              if (e.shiftKey && lastSelectedRemoteIndex !== null) {
+                                // Shift+click: select range
+                                const start = Math.min(lastSelectedRemoteIndex, i);
+                                const end = Math.max(lastSelectedRemoteIndex, i);
+                                const rangeNames = sortedRemoteFiles.slice(start, end + 1).map(f => f.name);
+                                setSelectedRemoteFiles(new Set(rangeNames));
+                              } else if (e.ctrlKey || e.metaKey) {
+                                // Ctrl/Cmd+click: toggle selection
                                 setSelectedRemoteFiles(prev => {
                                   const next = new Set(prev);
                                   if (next.has(file.name)) next.delete(file.name);
                                   else next.add(file.name);
                                   return next;
                                 });
+                                setLastSelectedRemoteIndex(i);
                               } else {
+                                // Normal click: single selection
                                 setSelectedRemoteFiles(new Set([file.name]));
+                                setLastSelectedRemoteIndex(i);
                               }
                             }}
                             onDoubleClick={() => handleRemoteFileAction(file)}
@@ -1667,21 +1679,28 @@ const App: React.FC = () => {
                           <span className="file-grid-name italic text-gray-500">Go up</span>
                         </div>
                       )}
-                      {sortedRemoteFiles.map((file) => (
+                      {sortedRemoteFiles.map((file, i) => (
                         <div
                           key={file.name}
                           className={`file-grid-item ${selectedRemoteFiles.has(file.name) ? 'selected' : ''}`}
                           onClick={(e) => {
                             if (file.name === '..') return;
-                            if (e.ctrlKey || e.metaKey) {
+                            if (e.shiftKey && lastSelectedRemoteIndex !== null) {
+                              const start = Math.min(lastSelectedRemoteIndex, i);
+                              const end = Math.max(lastSelectedRemoteIndex, i);
+                              const rangeNames = sortedRemoteFiles.slice(start, end + 1).map(f => f.name);
+                              setSelectedRemoteFiles(new Set(rangeNames));
+                            } else if (e.ctrlKey || e.metaKey) {
                               setSelectedRemoteFiles(prev => {
                                 const next = new Set(prev);
                                 if (next.has(file.name)) next.delete(file.name);
                                 else next.add(file.name);
                                 return next;
                               });
+                              setLastSelectedRemoteIndex(i);
                             } else {
                               setSelectedRemoteFiles(new Set([file.name]));
+                              setLastSelectedRemoteIndex(i);
                             }
                           }}
                           onDoubleClick={() => handleRemoteFileAction(file)}
@@ -1757,16 +1776,23 @@ const App: React.FC = () => {
                             key={file.name}
                             onClick={(e) => {
                               if (file.name === '..') return;
-                              if (e.ctrlKey || e.metaKey) {
+                              if (e.shiftKey && lastSelectedLocalIndex !== null) {
+                                const start = Math.min(lastSelectedLocalIndex, i);
+                                const end = Math.max(lastSelectedLocalIndex, i);
+                                const rangeNames = sortedLocalFiles.slice(start, end + 1).map(f => f.name);
+                                setSelectedLocalFiles(new Set(rangeNames));
+                              } else if (e.ctrlKey || e.metaKey) {
                                 setSelectedLocalFiles(prev => {
                                   const next = new Set(prev);
                                   if (next.has(file.name)) next.delete(file.name);
                                   else next.add(file.name);
                                   return next;
                                 });
+                                setLastSelectedLocalIndex(i);
                               } else {
                                 setSelectedLocalFiles(new Set([file.name]));
                                 setPreviewFile(file);
+                                setLastSelectedLocalIndex(i);
                               }
                             }}
                             onDoubleClick={() => {
@@ -1812,22 +1838,29 @@ const App: React.FC = () => {
                           <span className="file-grid-name italic text-gray-500">Go up</span>
                         </div>
                       )}
-                      {sortedLocalFiles.map((file) => (
+                      {sortedLocalFiles.map((file, i) => (
                         <div
                           key={file.name}
                           className={`file-grid-item ${selectedLocalFiles.has(file.name) ? 'selected' : ''}`}
                           onClick={(e) => {
                             if (file.name === '..') return;
-                            if (e.ctrlKey || e.metaKey) {
+                            if (e.shiftKey && lastSelectedLocalIndex !== null) {
+                              const start = Math.min(lastSelectedLocalIndex, i);
+                              const end = Math.max(lastSelectedLocalIndex, i);
+                              const rangeNames = sortedLocalFiles.slice(start, end + 1).map(f => f.name);
+                              setSelectedLocalFiles(new Set(rangeNames));
+                            } else if (e.ctrlKey || e.metaKey) {
                               setSelectedLocalFiles(prev => {
                                 const next = new Set(prev);
                                 if (next.has(file.name)) next.delete(file.name);
                                 else next.add(file.name);
                                 return next;
                               });
+                              setLastSelectedLocalIndex(i);
                             } else {
                               setSelectedLocalFiles(new Set([file.name]));
                               setPreviewFile(file);
+                              setLastSelectedLocalIndex(i);
                             }
                           }}
                           onDoubleClick={() => {
