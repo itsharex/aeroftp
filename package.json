@@ -1,7 +1,7 @@
 {
   "name": "aeroftp",
   "private": true,
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "AeroFTP - Fast, Beautiful, Reliable FTP Client",
   "type": "module",
   "scripts": {
@@ -16,9 +16,11 @@
     "@tauri-apps/plugin-dialog": "^2.4.2",
     "@tauri-apps/plugin-fs": "^2.4.4",
     "@tauri-apps/plugin-log": "~2",
+    "@types/howler": "^2.2.12",
     "@types/prismjs": "^1.26.5",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
+    "howler": "^2.2.4",
     "lucide-react": "^0.378.0",
     "prismjs": "^1.30.0",
     "react": "^18.2.0",

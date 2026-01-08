@@ -979,6 +979,7 @@ const App: React.FC = () => {
           content = await invoke<string>('read_local_file', { path: filePath });
         } else {
           // For binary files (images, audio, video), load as base64 and convert to Blob URL
+          // Note: Large files may take time to load - we show a loading toast
           const base64 = await invoke<string>('read_local_file_base64', { path: filePath });
 
           // Convert base64 to Blob for better streaming performance

@@ -1,16 +1,17 @@
 /**
  * Audio Player Component - AeroPlayer CYBER EDITION 🔥
  * 
- * Full-featured audio player with:
- * - HTML5 Audio + Web Audio API integration
+ * Full-featured audio player powered by Howler.js:
+ * - Robust streaming and buffering for large files
  * - Playback controls (play/pause/seek/volume)
- * - Real-time visualizer with 4 modes + Cyber Mode
+ * - Real-time visualizer with multiple modes
  * - 10-band graphic equalizer
  * - Keyboard shortcuts
  * - Playback speed control & Loop toggle
  */
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { Howl, Howler } from 'howler';
 import {
     Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
     Repeat, Gauge, Activity, BarChart2, Circle, Waves, Zap, ChevronDown, Loader2,
@@ -51,14 +52,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     className = '',
 }) => {
     // Refs
-    const audioRef = useRef<HTMLAudioElement>(null);
-    const audioContextRef = useRef<AudioContext | null>(null);
+    const howlRef = useRef<Howl | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
-    const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-    const filtersRef = useRef<BiquadFilterNode[]>([]);
-    const gainNodeRef = useRef<GainNode | null>(null);
-    const pannerRef = useRef<StereoPannerNode | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const updateIntervalRef = useRef<number | null>(null);
 
     // State
     const [playback, setPlayback] = useState<PlaybackState>({
@@ -78,168 +75,180 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const [showMixer, setShowMixer] = useState(false);
     const [showVisualizerMenu, setShowVisualizerMenu] = useState(false);
     const [isAudioReady, setIsAudioReady] = useState(false);
-    const [isBuffering, setIsBuffering] = useState(false);
+    const [isBuffering, setIsBuffering] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Audio source URL
     const audioSrc = file.blobUrl || file.content as string || '';
 
-    // Initialize Web Audio API
-    const initAudioContext = useCallback(() => {
-        if (audioContextRef.current || !audioRef.current) return;
+    // Extract format from filename for Howler (blob URLs don't have extensions)
+    const audioFormat = file.name.split('.').pop()?.toLowerCase() || 'mp3';
 
-        try {
-            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            audioContextRef.current = ctx;
-
-            const source = ctx.createMediaElementSource(audioRef.current);
-            sourceRef.current = source;
-
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 256;
-            analyserRef.current = analyser;
-
-            const gainNode = ctx.createGain();
-            gainNodeRef.current = gainNode;
-
-            const panner = ctx.createStereoPanner();
-            pannerRef.current = panner;
-
-            const filters = EQ_BANDS.map((band) => {
-                const filter = ctx.createBiquadFilter();
-                filter.type = 'peaking';
-                filter.frequency.value = band.freq;
-                filter.Q.value = 1;
-                filter.gain.value = 0;
-                return filter;
-            });
-            filtersRef.current = filters;
-
-            // Connect: source -> filters -> panner -> gain -> analyser -> destination
-            let lastNode: AudioNode = source;
-            filters.forEach((filter) => {
-                lastNode.connect(filter);
-                lastNode = filter;
-            });
-            lastNode.connect(panner);
-            panner.connect(gainNode);
-            gainNode.connect(analyser);
-            analyser.connect(ctx.destination);
-
-        } catch (error) {
-            console.error('Failed to initialize Web Audio API:', error);
-        }
-    }, []);
-
-    // Update EQ filters when state changes
+    // Initialize Howler
     useEffect(() => {
-        if (!filtersRef.current.length) return;
-        filtersRef.current.forEach((filter, index) => {
-            filter.gain.value = eqState.enabled ? eqState.bands[index] : 0;
+        if (!audioSrc) return;
+
+        // Cleanup previous instance
+        if (howlRef.current) {
+            howlRef.current.unload();
+        }
+
+        // Create new Howl instance
+        const howl = new Howl({
+            src: [audioSrc],
+            format: [audioFormat], // Specify format since blob URLs don't have extensions
+            html5: true, // Use HTML5 Audio for streaming large files
+            preload: true,
+            volume: playback.volume,
+            loop: playback.isLooping,
+            onload: () => {
+                setIsAudioReady(true);
+                setIsBuffering(false);
+                setPlayback(prev => ({
+                    ...prev,
+                    duration: howl.duration(),
+                }));
+                setMetadata({
+                    title: file.name.replace(/\.[^/.]+$/, ''),
+                });
+
+                // Setup Web Audio API analyser for visualizer
+                // With html5:true, we need to connect the audio element directly
+                try {
+                    const ctx = Howler.ctx;
+                    if (ctx && !analyserRef.current) {
+                        const analyser = ctx.createAnalyser();
+                        analyser.fftSize = 256;
+                        analyserRef.current = analyser;
+
+                        // For html5 mode, get the underlying audio element
+                        // @ts-ignore - accessing internal Howler structure
+                        const audioNode = howl._sounds[0]?._node;
+                        if (audioNode && audioNode instanceof HTMLAudioElement) {
+                            // Create a MediaElementSource from the audio element
+                            const source = ctx.createMediaElementSource(audioNode);
+                            source.connect(analyser);
+                            analyser.connect(ctx.destination);
+                        } else {
+                            // Fallback: connect to master gain
+                            Howler.masterGain.connect(analyser);
+                            analyser.connect(ctx.destination);
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Failed to setup analyser:', err);
+                }
+            },
+            onloaderror: (_id, error) => {
+                console.error('Howler load error:', error);
+                setIsBuffering(false);
+                onError?.('Failed to load audio file');
+            },
+            onplayerror: (_id, error) => {
+                console.error('Howler play error:', error);
+                // Try to unlock and play again
+                howl.once('unlock', () => {
+                    howl.play();
+                });
+            },
+            onplay: () => {
+                setPlayback(prev => ({ ...prev, isPlaying: true }));
+                // Start time update interval
+                updateIntervalRef.current = window.setInterval(() => {
+                    if (howlRef.current) {
+                        const seek = howlRef.current.seek() as number;
+                        setPlayback(prev => ({
+                            ...prev,
+                            currentTime: seek,
+                        }));
+                    }
+                }, 100);
+            },
+            onpause: () => {
+                setPlayback(prev => ({ ...prev, isPlaying: false }));
+                if (updateIntervalRef.current) {
+                    clearInterval(updateIntervalRef.current);
+                }
+            },
+            onstop: () => {
+                setPlayback(prev => ({ ...prev, isPlaying: false, currentTime: 0 }));
+                if (updateIntervalRef.current) {
+                    clearInterval(updateIntervalRef.current);
+                }
+            },
+            onend: () => {
+                if (!playback.isLooping) {
+                    setPlayback(prev => ({ ...prev, isPlaying: false }));
+                    if (updateIntervalRef.current) {
+                        clearInterval(updateIntervalRef.current);
+                    }
+                }
+            },
+            onseek: () => {
+                if (howlRef.current) {
+                    setPlayback(prev => ({
+                        ...prev,
+                        currentTime: howlRef.current!.seek() as number,
+                    }));
+                }
+            },
         });
-    }, [eqState.bands, eqState.enabled]);
 
-    // Update balance
-    useEffect(() => {
-        if (pannerRef.current) {
-            pannerRef.current.pan.value = eqState.balance;
-        }
-    }, [eqState.balance]);
+        howlRef.current = howl;
+
+        // Cleanup on unmount
+        return () => {
+            if (updateIntervalRef.current) {
+                clearInterval(updateIntervalRef.current);
+            }
+            if (howlRef.current) {
+                howlRef.current.unload();
+                howlRef.current = null;
+            }
+        };
+    }, [audioSrc, file.name]); // Only reinitialize when source changes
 
     // Update volume
     useEffect(() => {
-        if (gainNodeRef.current) {
-            gainNodeRef.current.gain.value = playback.isMuted ? 0 : playback.volume;
+        if (howlRef.current) {
+            howlRef.current.volume(playback.isMuted ? 0 : playback.volume);
         }
     }, [playback.volume, playback.isMuted]);
 
-    // Audio event handlers
-    const handleLoadedMetadata = useCallback(() => {
-        if (audioRef.current) {
-            setPlayback(prev => ({
-                ...prev,
-                duration: audioRef.current!.duration,
-            }));
-            setIsAudioReady(true);
-            setIsBuffering(false);
-            setMetadata({
-                title: file.name.replace(/\.[^/.]+$/, ''),
-            });
-        }
-    }, [file.name]);
-
-    const handleTimeUpdate = useCallback(() => {
-        if (audioRef.current) {
-            setPlayback(prev => ({
-                ...prev,
-                currentTime: audioRef.current!.currentTime,
-            }));
-        }
-    }, []);
-
-    const handleEnded = useCallback(() => {
-        if (playback.isLooping && audioRef.current) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play();
-        } else {
-            setPlayback(prev => ({ ...prev, isPlaying: false }));
+    // Update loop
+    useEffect(() => {
+        if (howlRef.current) {
+            howlRef.current.loop(playback.isLooping);
         }
     }, [playback.isLooping]);
 
-    const handleProgress = useCallback(() => {
-        if (audioRef.current && audioRef.current.buffered.length > 0) {
-            const bufferedEnd = audioRef.current.buffered.end(audioRef.current.buffered.length - 1);
-            const duration = audioRef.current.duration;
-            setPlayback(prev => ({
-                ...prev,
-                bufferedPercent: duration > 0 ? (bufferedEnd / duration) * 100 : 0,
-            }));
+    // Update playback rate
+    useEffect(() => {
+        if (howlRef.current) {
+            howlRef.current.rate(playback.playbackRate);
         }
-    }, []);
-
-    const handleError = useCallback(() => {
-        onError?.('Failed to load audio file');
-    }, [onError]);
+    }, [playback.playbackRate]);
 
     // Playback controls
-    const togglePlay = useCallback(async () => {
-        if (!audioRef.current) return;
+    const togglePlay = useCallback(() => {
+        if (!howlRef.current) return;
 
-        // Initialize audio context on first play (required for Web Audio API)
-        if (!audioContextRef.current) {
-            initAudioContext();
-        }
-
-        // Resume suspended audio context (browser autoplay policy)
-        if (audioContextRef.current?.state === 'suspended') {
-            await audioContextRef.current.resume();
-        }
-
-        // Use actual audio element state, not our playback state
-        if (audioRef.current.paused) {
-            try {
-                await audioRef.current.play();
-            } catch (err) {
-                console.error('Failed to play audio:', err);
-            }
+        if (playback.isPlaying) {
+            howlRef.current.pause();
         } else {
-            audioRef.current.pause();
+            howlRef.current.play();
         }
-        // Note: isPlaying state is updated by onPlay/onPause handlers
-    }, [initAudioContext]);
+    }, [playback.isPlaying]);
 
     const seek = useCallback((time: number) => {
-        if (audioRef.current) {
-            audioRef.current.currentTime = time;
+        if (howlRef.current) {
+            howlRef.current.seek(time);
             setPlayback(prev => ({ ...prev, currentTime: time }));
         }
     }, []);
 
     const setVolume = useCallback((volume: number) => {
-        if (audioRef.current) {
-            audioRef.current.volume = volume;
-            setPlayback(prev => ({ ...prev, volume, isMuted: volume === 0 }));
-        }
+        setPlayback(prev => ({ ...prev, volume, isMuted: volume === 0 }));
     }, []);
 
     const toggleMute = useCallback(() => {
@@ -247,17 +256,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }, []);
 
     const toggleLoop = useCallback(() => {
-        if (audioRef.current) {
-            audioRef.current.loop = !playback.isLooping;
-            setPlayback(prev => ({ ...prev, isLooping: !prev.isLooping }));
-        }
-    }, [playback.isLooping]);
+        setPlayback(prev => ({ ...prev, isLooping: !prev.isLooping }));
+    }, []);
 
     const setPlaybackRate = useCallback((rate: number) => {
-        if (audioRef.current) {
-            audioRef.current.playbackRate = rate;
-            setPlayback(prev => ({ ...prev, playbackRate: rate }));
-        }
+        setPlayback(prev => ({ ...prev, playbackRate: rate }));
     }, []);
 
     const skipBackward = useCallback(() => {
@@ -271,7 +274,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Only handle if this player is focused
             if (!containerRef.current?.contains(document.activeElement) &&
                 document.activeElement !== document.body) {
                 return;
@@ -344,19 +346,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             tabIndex={0}
             onWheel={handleWheel}
         >
-            {/* Hidden audio element */}
-            <audio
-                ref={audioRef}
-                src={audioSrc}
-                onLoadedMetadata={handleLoadedMetadata}
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={handleEnded}
-                onProgress={handleProgress}
-                onError={handleError}
-                onPlay={() => setPlayback(prev => ({ ...prev, isPlaying: true }))}
-                onPause={() => setPlayback(prev => ({ ...prev, isPlaying: false }))}
-            />
-
             {/* Visualizer area - expands in fullscreen mode */}
             <div className={`flex-1 flex items-center justify-center ${isFullscreen ? 'p-0' : 'p-6'}`}>
                 <div className={`w-full ${isFullscreen ? 'h-full' : 'max-w-4xl h-72'} relative`}>
@@ -368,6 +357,16 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                         cyberMode={cyberMode}
                         className={isFullscreen ? '' : 'rounded-xl'}
                     />
+
+                    {/* Buffering overlay */}
+                    {isBuffering && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
+                            <div className="flex flex-col items-center gap-2">
+                                <Loader2 size={32} className="text-cyan-400 animate-spin" />
+                                <span className="text-sm text-gray-300">Loading audio...</span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Top controls overlay */}
                     <div className="absolute top-2 right-2 flex items-center gap-2">
@@ -483,12 +482,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                             ? 'bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500'
                             : 'bg-gradient-to-r from-blue-500 to-purple-500'
                             } ${playback.isPlaying ? 'shadow-md shadow-purple-500/40' : ''}`}
-                        style={{ width: `${(playback.currentTime / playback.duration) * 100}%` }}
+                        style={{ width: `${playback.duration > 0 ? (playback.currentTime / playback.duration) * 100 : 0}%` }}
                     />
                     {/* Thumb */}
                     <div
                         className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all ${cyberMode ? 'bg-cyan-400 shadow-cyan-400/50' : 'bg-white shadow-white/30'}`}
-                        style={{ left: `calc(${(playback.currentTime / playback.duration) * 100}% - 8px)` }}
+                        style={{ left: `calc(${playback.duration > 0 ? (playback.currentTime / playback.duration) * 100 : 0}% - 8px)` }}
                     />
                 </div>
                 <div className="flex justify-between mt-1 text-xs text-gray-500 font-mono">
