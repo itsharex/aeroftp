@@ -15,7 +15,7 @@ import { Howl, Howler } from 'howler';
 import {
     Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
     Repeat, Gauge, Activity, BarChart2, Circle, Waves, Zap, ChevronDown, Loader2,
-    Sparkles, Flame, Maximize2, Minimize2, Eye
+    Sparkles, Flame, Maximize2, Minimize2, Eye, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import { ViewerBaseProps, PlaybackState, EqualizerState, MediaMetadata } from '../types';
 import { formatDuration } from '../utils/fileTypes';
@@ -46,6 +46,13 @@ const VISUALIZER_MODES: { value: VisualizerMode; label: string; icon: React.Reac
     { value: 'kaleidoscope', label: 'Kaleidoscope', icon: <Eye size={14} /> },
 ];
 
+// Global map to track audio elements already connected to MediaElementSource
+// This is necessary because once connected, an audio element cannot be reconnected
+const connectedAudioElements = new WeakMap<HTMLMediaElement, {
+    source: MediaElementAudioSourceNode;
+    analyser: AnalyserNode;
+}>();
+
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     file,
     onError,
@@ -54,6 +61,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     // Refs
     const howlRef = useRef<Howl | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
+    const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+    const connectedElementRef = useRef<HTMLAudioElement | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const updateIntervalRef = useRef<number | null>(null);
 
@@ -77,6 +86,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const [isAudioReady, setIsAudioReady] = useState(false);
     const [isBuffering, setIsBuffering] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
+    const maxRetries = 3;
 
     // Audio source URL
     const audioSrc = file.blobUrl || file.content as string || '';
@@ -94,45 +106,94 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         }
 
         // Create new Howl instance
+        // Large files (>10MB) use html5:true for streaming (no full decode needed)
+        // Small files use html5:false for better Web Audio API integration
+        const fileSizeBytes = file.size || 0;
+        const isLargeFile = fileSizeBytes > 10_000_000; // 10MB threshold
+
+        console.log(`Audio: ${file.name}, Size: ${(fileSizeBytes / 1024 / 1024).toFixed(1)}MB, Mode: ${isLargeFile ? 'HTML5 Streaming' : 'Web Audio API'}`);
+
         const howl = new Howl({
             src: [audioSrc],
             format: [audioFormat], // Specify format since blob URLs don't have extensions
-            html5: true, // Use HTML5 Audio for streaming large files
+            html5: isLargeFile, // Large files use streaming, small files use Web Audio decoding
             preload: true,
             volume: playback.volume,
             loop: playback.isLooping,
             onload: () => {
                 setIsAudioReady(true);
                 setIsBuffering(false);
+                setLoadError(null);
+                setRetryCount(0);
                 setPlayback(prev => ({
                     ...prev,
                     duration: howl.duration(),
                 }));
                 setMetadata({
-                    title: file.name.replace(/\.[^/.]+$/, ''),
+                    title: file.name.replace(/\\.[^/.]+$/, ''),
                 });
 
                 // Setup Web Audio API analyser for visualizer
-                // With html5:true, we need to connect the audio element directly
                 try {
                     const ctx = Howler.ctx;
-                    if (ctx && !analyserRef.current) {
-                        const analyser = ctx.createAnalyser();
-                        analyser.fftSize = 256;
-                        analyserRef.current = analyser;
+                    if (ctx) {
+                        if (isLargeFile) {
+                            // HTML5 mode: Connect via MediaElementSource
+                            // @ts-ignore - accessing internal Howler structure
+                            const audioElement = howl._sounds?.[0]?._node as HTMLMediaElement | undefined;
 
-                        // For html5 mode, get the underlying audio element
-                        // @ts-ignore - accessing internal Howler structure
-                        const audioNode = howl._sounds[0]?._node;
-                        if (audioNode && audioNode instanceof HTMLAudioElement) {
-                            // Create a MediaElementSource from the audio element
-                            const source = ctx.createMediaElementSource(audioNode);
-                            source.connect(analyser);
-                            analyser.connect(ctx.destination);
+                            if (audioElement && audioElement instanceof HTMLMediaElement) {
+                                // Check if this element was already connected (from a previous load)
+                                const existingConnection = connectedAudioElements.get(audioElement);
+
+                                if (existingConnection) {
+                                    // Reuse existing analyser from previous connection
+                                    analyserRef.current = existingConnection.analyser;
+                                    sourceNodeRef.current = existingConnection.source;
+                                    console.log('Reusing existing MediaElementSource connection for visualizer');
+                                } else {
+                                    // Create new connection
+                                    const analyser = ctx.createAnalyser();
+                                    analyser.fftSize = 256;
+                                    analyser.smoothingTimeConstant = 0.8;
+
+                                    try {
+                                        const source = ctx.createMediaElementSource(audioElement);
+                                        source.connect(analyser);
+                                        analyser.connect(ctx.destination);
+
+                                        // Store in global map for future reuse
+                                        connectedAudioElements.set(audioElement, { source, analyser });
+
+                                        analyserRef.current = analyser;
+                                        sourceNodeRef.current = source;
+                                        connectedElementRef.current = audioElement;
+                                        console.log('Visualizer connected via MediaElementSource (HTML5 streaming mode)');
+                                    } catch (sourceErr: any) {
+                                        if (sourceErr.name === 'InvalidStateError') {
+                                            // Element was connected outside our tracking, no visualizer possible
+                                            console.warn('Audio element already connected externally, visualizer disabled');
+                                            analyserRef.current = analyser; // Still set analyser for UI, but it won't have data
+                                        } else {
+                                            throw sourceErr;
+                                        }
+                                    }
+                                }
+                            } else {
+                                console.warn('No audio element found for HTML5 mode visualizer');
+                            }
                         } else {
-                            // Fallback: connect to master gain
-                            Howler.masterGain.connect(analyser);
-                            analyser.connect(ctx.destination);
+                            // Web Audio mode: Connect via masterGain (works because audio flows through it)
+                            if (!analyserRef.current) {
+                                const analyser = ctx.createAnalyser();
+                                analyser.fftSize = 256;
+                                analyser.smoothingTimeConstant = 0.8;
+                                analyserRef.current = analyser;
+
+                                Howler.masterGain.connect(analyser);
+                                analyser.connect(ctx.destination);
+                                console.log('Visualizer connected via masterGain (Web Audio mode)');
+                            }
                         }
                     }
                 } catch (err) {
@@ -141,7 +202,25 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             },
             onloaderror: (_id, error) => {
                 console.error('Howler load error:', error);
+
+                // Auto-retry logic for intermittent failures
+                if (retryCount < maxRetries) {
+                    console.log(`Retrying audio load (${retryCount + 1}/${maxRetries})...`);
+                    setRetryCount(prev => prev + 1);
+                    // Delay retry slightly to allow blob URL to stabilize
+                    setTimeout(() => {
+                        if (howlRef.current) {
+                            howlRef.current.unload();
+                        }
+                        // Trigger re-render by updating a state
+                        setIsBuffering(true);
+                    }, 500 * (retryCount + 1)); // Increasing delay
+                    return;
+                }
+
+                // Max retries reached, show error
                 setIsBuffering(false);
+                setLoadError('Failed to load audio file. The file may be too large or the format is unsupported.');
                 onError?.('Failed to load audio file');
             },
             onplayerror: (_id, error) => {
@@ -205,8 +284,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 howlRef.current.unload();
                 howlRef.current = null;
             }
+            // Reset analyser refs so they get recreated on next audio load
+            analyserRef.current = null;
+            sourceNodeRef.current = null;
+            connectedElementRef.current = null;
         };
-    }, [audioSrc, file.name]); // Only reinitialize when source changes
+    }, [audioSrc, file.name, retryCount]); // Reinitialize when source changes or on retry
 
     // Update volume
     useEffect(() => {
@@ -359,11 +442,34 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                     />
 
                     {/* Buffering overlay */}
-                    {isBuffering && (
+                    {isBuffering && !loadError && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
                             <div className="flex flex-col items-center gap-2">
                                 <Loader2 size={32} className="text-cyan-400 animate-spin" />
-                                <span className="text-sm text-gray-300">Loading audio...</span>
+                                <span className="text-sm text-gray-300">
+                                    {retryCount > 0 ? `Retrying... (${retryCount}/${maxRetries})` : 'Loading audio...'}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Error overlay with retry button */}
+                    {loadError && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/70 rounded-xl">
+                            <div className="flex flex-col items-center gap-3 text-center px-4">
+                                <AlertTriangle size={40} className="text-yellow-500" />
+                                <span className="text-sm text-red-400">{loadError}</span>
+                                <button
+                                    onClick={() => {
+                                        setLoadError(null);
+                                        setRetryCount(0);
+                                        setIsBuffering(true);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors"
+                                >
+                                    <RefreshCw size={16} />
+                                    Try Again
+                                </button>
                             </div>
                         </div>
                     )}

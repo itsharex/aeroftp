@@ -29,7 +29,7 @@ import { AboutDialog } from './components/AboutDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { SettingsPanel } from './components/SettingsPanel';
 import { StatusBar } from './components/StatusBar';
-import { UploadQueue, useUploadQueue } from './components/UploadQueue';
+import { TransferQueue, useTransferQueue } from './components/TransferQueue';
 import { CustomTitlebar } from './components/CustomTitlebar';
 import { DevToolsV2, PreviewFile, isPreviewable } from './components/DevTools';
 import { UniversalPreview, PreviewFileData, getPreviewCategory, isPreviewable as isMediaPreviewable } from './components/Preview';
@@ -74,7 +74,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeTransfer, setActiveTransfer] = useState<TransferProgress | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);  // FTP reconnection in progress
-  const hasActivity = activeTransfer !== null;  // Track if upload/download in progress
+  const hasActivity = activeTransfer !== null;  // Track if upload/download in progress (will be updated below)
   const [activePanel, setActivePanel] = useState<'remote' | 'local'>('remote');
   const [remoteSortField, setRemoteSortField] = useState<SortField>('name');
   const [remoteSortOrder, setRemoteSortOrder] = useState<SortOrder>('asc');
@@ -99,6 +99,7 @@ const App: React.FC = () => {
   const [cloudServerName, setCloudServerName] = useState<string>('');  // Cloud server profile name
   const [cloudLastSync, setCloudLastSync] = useState<string | null>(null);  // Last sync timestamp for badges
   const [cloudLocalFolder, setCloudLocalFolder] = useState<string>('');  // Cloud local folder path
+  const [cloudRemoteFolder, setCloudRemoteFolder] = useState<string>('');  // Cloud remote folder path
   const [showConnectionScreen, setShowConnectionScreen] = useState(true);  // Initial connection screen, can be skipped
   const [showMenuBar, setShowMenuBar] = useState(true);  // Internal header visibility
   const [systemMenuVisible, setSystemMenuVisible] = useState(true);  // Native system menu bar
@@ -111,8 +112,11 @@ const App: React.FC = () => {
   const [sessions, setSessions] = useState<FtpSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  // Upload Queue
-  const uploadQueue = useUploadQueue();
+  // Transfer Queue (unified upload + download)
+  const transferQueue = useTransferQueue();
+
+  // Track if any transfer is active (for Logo animation)
+  const hasQueueActivity = transferQueue.hasActiveTransfers;
 
   const [localSearchFilter, setLocalSearchFilter] = useState('');
   const [showLocalPreview, setShowLocalPreview] = useState(false);
@@ -133,14 +137,13 @@ const App: React.FC = () => {
 
   // Sync Badge Helper - returns badge element if file is in cloud folder
   const getSyncBadge = (filePath: string, fileModified: string | undefined, isLocal: boolean) => {
-    // Only show badges if cloud is active and we're in a cloud folder
-    if (!isCloudActive || !cloudLastSync || !cloudLocalFolder) return null;
+    // Only show badges if cloud is active and we have cloud folder paths
+    if (!isCloudActive || !cloudLastSync || !cloudLocalFolder || !cloudRemoteFolder) return null;
 
-    // Check if current path is within cloud folder
+    // Check if current path is within cloud folder (local or remote)
     const currentPath = isLocal ? currentLocalPath : currentRemotePath;
-    const isInCloudFolder = isLocal
-      ? currentPath.startsWith(cloudLocalFolder) || currentPath === cloudLocalFolder
-      : true; // For remote, we assume if cloud is active, we show badges
+    const cloudFolder = isLocal ? cloudLocalFolder : cloudRemoteFolder;
+    const isInCloudFolder = currentPath.startsWith(cloudFolder) || currentPath === cloudFolder;
 
     if (!isInCloudFolder) return null;
 
@@ -367,15 +370,18 @@ const App: React.FC = () => {
     else { setLocalSortField(field); setLocalSortOrder('asc'); }
   };
 
-  // Transfer events
+  // Transfer events (backend progress updates)
   useEffect(() => {
     const unlisten = listen<TransferEvent>('transfer_event', (event) => {
       const data = event.payload;
-      if (data.event_type === 'start') toast.info('Transfer Started', data.message);
-      else if (data.event_type === 'progress' && data.progress) setActiveTransfer(data.progress);
-      else if (data.event_type === 'complete') {
+      // Queue handles visual feedback - only track progress here
+      if (data.event_type === 'start') {
+        // No toast - queue shows start
+      } else if (data.event_type === 'progress' && data.progress) {
+        setActiveTransfer(data.progress);
+      } else if (data.event_type === 'complete') {
         setActiveTransfer(null);
-        toast.success('Transfer Complete', data.message);
+        // No toast - queue shows completion
         if (data.direction === 'upload') loadRemoteFiles();
         else loadLocalFiles(currentLocalPath);
       } else if (data.event_type === 'error') {
@@ -462,6 +468,7 @@ const App: React.FC = () => {
           server_profile?: string;
           last_sync?: string;
           local_folder?: string;
+          remote_folder?: string;
         }>('get_cloud_config');
         setIsCloudActive(config.enabled);
         if (config.server_profile) {
@@ -472,6 +479,9 @@ const App: React.FC = () => {
         }
         if (config.local_folder) {
           setCloudLocalFolder(config.local_folder);
+        }
+        if (config.remote_folder) {
+          setCloudRemoteFolder(config.remote_folder);
         }
 
         // Auto-start background sync if cloud is enabled
@@ -619,8 +629,8 @@ const App: React.FC = () => {
     const session = sessions.find(s => s.id === sessionId);
     if (!session) return;
 
-    // Save current session state before switching
-    if (activeSessionId) {
+    // Save current session state before switching (only if different session)
+    if (activeSessionId && activeSessionId !== sessionId) {
       setSessions(prev => prev.map(s =>
         s.id === activeSessionId
           ? { ...s, remoteFiles: [...remoteFiles], localFiles: [...localFiles], remotePath: currentRemotePath, localPath: currentLocalPath }
@@ -636,19 +646,19 @@ const App: React.FC = () => {
     setConnectionParams(session.connectionParams);
     setActiveSessionId(sessionId);
 
-    // Background reconnect if needed
-    if (session.status === 'cached' || session.status === 'disconnected') {
-      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connecting' } : s));
-      try {
-        await invoke('connect_ftp', { params: session.connectionParams });
-        await invoke('change_directory', { path: session.remotePath });
-        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connected' } : s));
-        // Silent refresh
-        const response: FileListResponse = await invoke('list_files');
-        setRemoteFiles(response.files);
-      } catch {
-        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'cached' } : s));
-      }
+    // Reconnect and navigate to handle Cloud Tab switching
+    // Set status to connecting and reconnect
+    setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connecting' } : s));
+    try {
+      await invoke('connect_ftp', { params: session.connectionParams });
+      await invoke('change_directory', { path: session.remotePath });
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connected' } : s));
+      // Refresh with real data
+      const response: FileListResponse = await invoke('list_files');
+      setRemoteFiles(response.files);
+    } catch (e) {
+      console.log('Reconnect error:', e);
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'cached' } : s));
     }
   };
 
@@ -704,6 +714,23 @@ const App: React.FC = () => {
       // If already connected, just trigger sync and navigate to cloud folders
       if (isConnected) {
         console.log('Already connected, just syncing and navigating...');
+
+        // IMPORTANT: Save current session state before navigating to cloud
+        // Capture current state values for the closure
+        const capturedRemoteFiles = remoteFiles;
+        const capturedLocalFiles = localFiles;
+        const capturedRemotePath = currentRemotePath;
+        const capturedLocalPath = currentLocalPath;
+        const capturedSessionId = activeSessionId;
+
+        if (capturedSessionId) {
+          setSessions(prev => prev.map(s =>
+            s.id === capturedSessionId
+              ? { ...s, remoteFiles: [...capturedRemoteFiles], localFiles: [...capturedLocalFiles], remotePath: capturedRemotePath, localPath: capturedLocalPath }
+              : s
+          ));
+        }
+
         // Navigate to cloud folders
         try {
           const remoteResponse: FileListResponse = await invoke('change_directory', { path: cloudConfig.remote_folder });
@@ -713,6 +740,10 @@ const App: React.FC = () => {
           const localFilesData: LocalFile[] = await invoke('get_local_files', { path: cloudConfig.local_folder });
           setLocalFiles(localFilesData);
           setCurrentLocalPath(cloudConfig.local_folder);
+
+          // Update cloud folder state for badge display
+          setCloudRemoteFolder(cloudConfig.remote_folder);
+          setCloudLocalFolder(cloudConfig.local_folder);
         } catch (navError) {
           console.log('Navigation error:', navError);
         }
@@ -769,8 +800,8 @@ const App: React.FC = () => {
       setCurrentRemotePath(remoteResponse.current_path);
 
       // Local: navigate to cloud local folder
-      const localFiles: LocalFile[] = await invoke('get_local_files', { path: cloudConfig.local_folder });
-      setLocalFiles(localFiles);
+      const cloudLocalFilesData: LocalFile[] = await invoke('get_local_files', { path: cloudConfig.local_folder });
+      setLocalFiles(cloudLocalFilesData);
       setCurrentLocalPath(cloudConfig.local_folder);
 
       toast.success('Connected', `Connected to AeroCloud (${cloudConfig.server_profile})`);
@@ -977,12 +1008,27 @@ const App: React.FC = () => {
         if (category === 'text' || category === 'markdown') {
           // For text files, load as string
           content = await invoke<string>('read_local_file', { path: filePath });
-        } else {
-          // For binary files (images, audio, video), load as base64 and convert to Blob URL
-          // Note: Large files may take time to load - we show a loading toast
+        } else if (category === 'audio' || category === 'video') {
+          // For audio/video: Load as base64 and create blob URL
+          // Note: asset:// protocol doesn't work well on Linux WebKitGTK
+          console.log(`[Preview] Loading ${category} file as blob...`);
           const base64 = await invoke<string>('read_local_file_base64', { path: filePath });
 
-          // Convert base64 to Blob for better streaming performance
+          const mimeType = mimeMap[ext] || (category === 'audio' ? 'audio/mpeg' : 'video/mp4');
+          const byteCharacters = atob(base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: mimeType });
+          blobUrl = URL.createObjectURL(blob);
+          console.log(`[Preview] Created blob URL for ${category}`);
+        } else {
+          // For images and other binary files, load as base64 and convert to Blob URL
+          const base64 = await invoke<string>('read_local_file_base64', { path: filePath });
+
+          // Convert base64 to Blob for better performance
           const mimeType = mimeMap[ext] || 'application/octet-stream';
           const byteCharacters = atob(base64);
           const byteNumbers = new Array(byteCharacters.length);
@@ -1054,25 +1100,29 @@ const App: React.FC = () => {
       }).filter(Boolean) as string[];
 
       if (filesToUpload.length > 0) {
+        // Queue shows progress - no toast needed
+
         // Add all files to queue first
         const queueItems = filesToUpload.map(filePath => {
           const fileName = filePath.split(/[/\\]/).pop() || filePath;
           const file = localFiles.find(f => f.path === filePath);
           const size = file?.size || 0;
-          return { id: uploadQueue.addItem(fileName, filePath, size), filePath, fileName };
+          return { id: transferQueue.addItem(fileName, filePath, size, 'upload'), filePath, fileName };
         });
 
         // Upload sequentially with queue tracking
         for (const item of queueItems) {
-          uploadQueue.startUpload(item.id);
+          transferQueue.startTransfer(item.id);
           try {
             const file = localFiles.find(f => f.path === item.filePath);
             await uploadFile(item.filePath, item.fileName, file?.is_dir || false);
-            uploadQueue.completeUpload(item.id);
+            transferQueue.completeTransfer(item.id);
           } catch (error) {
-            uploadQueue.failUpload(item.id, String(error));
+            transferQueue.failTransfer(item.id, String(error));
           }
         }
+
+        // Queue shows completion - no toast needed
         setSelectedLocalFiles(new Set());
         loadRemoteFiles();
         return;
@@ -1107,11 +1157,28 @@ const App: React.FC = () => {
 
     const filesToDownload = names.map(n => remoteFiles.find(f => f.name === n)).filter(Boolean) as RemoteFile[];
     if (filesToDownload.length > 0) {
-      toast.info('Download Started', `Downloading ${filesToDownload.length} items...`);
-      for (const file of filesToDownload) {
-        await downloadFile(file.path, file.name, currentLocalPath, file.is_dir);
+      // Queue shows progress - no toast needed
+
+      // Add all files to queue first
+      const queueItems = filesToDownload.map(file => ({
+        id: transferQueue.addItem(file.name, file.path, file.size || 0, 'download'),
+        file
+      }));
+
+      // Download sequentially with queue tracking
+      for (const item of queueItems) {
+        transferQueue.startTransfer(item.id);
+        try {
+          await downloadFile(item.file.path, item.file.name, currentLocalPath, item.file.is_dir);
+          transferQueue.completeTransfer(item.id);
+        } catch (error) {
+          transferQueue.failTransfer(item.id, String(error));
+        }
       }
+
+      // Queue shows completion - no toast needed
       setSelectedRemoteFiles(new Set());
+      await loadLocalFiles(currentLocalPath);  // Refresh local panel
     }
   };
 
@@ -1329,11 +1396,11 @@ const App: React.FC = () => {
       {/* Native System Titlebar - CustomTitlebar removed for Linux compatibility */}
 
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
-      <UploadQueue
-        items={uploadQueue.items}
-        isVisible={uploadQueue.isVisible}
-        onToggle={uploadQueue.toggle}
-        onClear={uploadQueue.clear}
+      <TransferQueue
+        items={transferQueue.items}
+        isVisible={transferQueue.isVisible}
+        onToggle={transferQueue.toggle}
+        onClear={transferQueue.clear}
       />
       {contextMenu.state.visible && <ContextMenu x={contextMenu.state.x} y={contextMenu.state.y} items={contextMenu.state.items} onClose={contextMenu.hide} />}
       {activeTransfer && <TransferProgressBar transfer={activeTransfer} onCancel={cancelTransfer} />}
@@ -1394,7 +1461,7 @@ const App: React.FC = () => {
       {showMenuBar && (
         <header className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between px-6 py-3">
-            <Logo size="md" isConnected={isConnected} hasActivity={hasActivity} isReconnecting={isReconnecting} />
+            <Logo size="md" isConnected={isConnected} hasActivity={hasActivity || hasQueueActivity} isReconnecting={isReconnecting} />
             <div className="flex items-center gap-3">
               {/* Quick System Menu Bar Toggle */}
               <button
@@ -2094,6 +2161,9 @@ const App: React.FC = () => {
         onToggleCloud={() => setShowCloudPanel(true)}
         cloudEnabled={isCloudActive}
         cloudSyncing={cloudSyncing}
+        transferQueueActive={transferQueue.hasActiveTransfers}
+        transferQueueCount={transferQueue.items.length}
+        onToggleTransferQueue={transferQueue.toggle}
       />
     </div>
   );

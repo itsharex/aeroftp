@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-01-15
+
+### Added
+- **Unified Transfer Queue**: New `TransferQueue` component showing both uploads and downloads
+  - Visual indicators for upload (↑ cyan) and download (↓ orange) operations
+  - Real-time progress counter `[N/total]`
+  - Auto-scroll to active transfer
+  - "Queue" button in StatusBar with item count badge
+  - Auto-hide after 5 seconds, reopens on click
+- **Sync Badge visibility fix**: Sync badges now only appear in AeroCloud folder paths
+
+### Fixed
+- **Tab switching with Cloud**: Fixed session state persistence when switching between FTP servers and AeroCloud
+- **Notification spam**: Removed per-file toast notifications during bulk transfers (queue shows progress instead)
+- **Logo activity animation**: Now correctly pulses during all transfer operations
+
+### Changed
+- Transfer notifications consolidated: only error/warning toasts are shown
+
 ## [0.9.1] - 2026-01-06
 
 ### Fixed

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Globe, HardDrive, Wifi, WifiOff, Code, FolderSync, Cloud } from 'lucide-react';
+import { Globe, HardDrive, Wifi, WifiOff, Code, FolderSync, Cloud, ArrowUpDown } from 'lucide-react';
 import { useTranslation } from '../i18n';
 
 interface StatusBarProps {
@@ -13,9 +13,12 @@ interface StatusBarProps {
     devToolsOpen?: boolean;
     cloudEnabled?: boolean;
     cloudSyncing?: boolean;
+    transferQueueActive?: boolean;
+    transferQueueCount?: number;
     onToggleDevTools?: () => void;
     onToggleSync?: () => void;
     onToggleCloud?: () => void;
+    onToggleTransferQueue?: () => void;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -29,9 +32,12 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     devToolsOpen = false,
     cloudEnabled = false,
     cloudSyncing = false,
+    transferQueueActive = false,
+    transferQueueCount = 0,
     onToggleDevTools,
     onToggleSync,
     onToggleCloud,
+    onToggleTransferQueue,
 }) => {
     const t = useTranslation();
 
@@ -95,6 +101,26 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
                 {/* Separator */}
                 <div className="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+
+                {/* Transfer Queue Toggle */}
+                {onToggleTransferQueue && (
+                    <button
+                        onClick={onToggleTransferQueue}
+                        className={`flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors ${transferQueueActive
+                                ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400'
+                                : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+                            }`}
+                        title="Transfer Queue"
+                    >
+                        <ArrowUpDown size={12} className={transferQueueActive ? 'animate-pulse' : ''} />
+                        <span>Queue</span>
+                        {transferQueueCount > 0 && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-orange-500 text-white rounded-full min-w-[18px] text-center">
+                                {transferQueueCount}
+                            </span>
+                        )}
+                    </button>
+                )}
 
                 {/* Cloud Button */}
                 {onToggleCloud && (
