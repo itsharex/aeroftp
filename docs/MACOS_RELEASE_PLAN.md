@@ -1,8 +1,7 @@
 # 🍎 AeroFTP macOS Release Plan
 
-**Version Target**: 0.7.0
-**Date**: 2025-01-XX
-**Author**: OpenCode (GLM-4.7) - Cesare
+**Current Version**: 0.9.5  
+**Last Updated**: 2026-01-15
 
 ---
 
@@ -413,13 +412,13 @@ codesign --force --deep --sign "identity" --options=runtime \
 
 ## 📅 Timeline Stimata
 
-| Fase | Durata | Inizio | Fine | Responsabile |
-|-------|---------|--------|------|-------------|
-| Configurazione | 2 giorni | Day 1 | Day 2 | Developer |
-| Testing | 1 settimana | Day 3 | Day 9 | Developer + Beta Testers |
-| Bug Fixes | 3 giorni | Day 10 | Day 12 | Developer |
-| Notarization | 1 giorno | Day 13 | Day 13 | Developer |
-| Release | 1 giorno | Day 14 | Day 14 | Developer |
+| Fase           | Durata      | Inizio | Fine   | Responsabile             |
+| -------------- | ----------- | ------ | ------ | ------------------------ |
+| Configurazione | 2 giorni    | Day 1  | Day 2  | Developer                |
+| Testing        | 1 settimana | Day 3  | Day 9  | Developer + Beta Testers |
+| Bug Fixes      | 3 giorni    | Day 10 | Day 12 | Developer                |
+| Notarization   | 1 giorno    | Day 13 | Day 13 | Developer                |
+| Release        | 1 giorno    | Day 14 | Day 14 | Developer                |
 
 **Totale**: ~2 settimane
 
@@ -458,6 +457,5 @@ Per iniziare oggi:
 
 ---
 
-**Creato da**: OpenCode (GLM-4.7) - Cesare
-**Data**: 2025-12-24
-**Stato**: Piano completo, pronto per implementazione
+**Last Updated**: 2026-01-15  
+**Status**: Plan complete, ready for implementation

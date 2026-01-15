@@ -154,7 +154,7 @@ npm run tauri build -- --target universal-apple-darwin
 # 3. Notarize (se hai Mac)
 xcrun notarytool submit \
   "src-tauri/target/release/bundle/dmg/AeroFTP-0.7.0-universal.dmg" \
-  --apple-id "your@email.com" \
+  --apple-id "YOUR_APPLE_ID" \
   --password "app-password" \
   --wait
 
@@ -269,6 +269,5 @@ Oggi stesso:
 
 ---
 
-**Creato da**: OpenCode (GLM-4.7) - Cesare
-**Data**: 2025-12-24
-**Scopo**: Guida rapida per rilascio macOS AeroFTP v0.7.0
+**Last Updated**: 2026-01-15  
+**Current Version**: 0.9.5

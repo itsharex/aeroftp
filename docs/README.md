@@ -6,107 +6,58 @@ Welcome to the AeroFTP documentation folder. This contains all technical documen
 
 ## 📋 Table of Contents
 
-| Document | Description | Purpose |
-|-----------|-------------|-----------|
-| **[CHANGELOG-OPENCODE.md](./CHANGELOG-OPENCODE.md)** | Session changelog from OpenCode (Cesare) | All features, fixes, and changes from current session |
-| **[MACOS_RELEASE_PLAN.md](./MACOS_RELEASE_PLAN.md)** | Complete macOS release plan | Step-by-step guide for macOS distribution (App Store, GitHub, direct) |
-| **[MACOS_QUICKSTART.md](./MACOS_QUICKSTART.md)** | Quick start guide for macOS | Immediate actions and testing checklist |
-| **[entitlements.plist](./entitlements.plist)** | macOS entitlements configuration | App sandbox and security permissions for macOS |
-| **[FLATHUB_SUBMISSION.md](./FLATHUB_SUBMISSION.md)** | Flathub submission guide | Linux Flatpak packaging and distribution |
-| **[logo.png](./logo.png)** | AeroFTP official logo | Brand assets for documentation/marketing |
+| Document                                             | Description                                                |
+| ---------------------------------------------------- | ---------------------------------------------------------- |
+| **[TRANSLATIONS.md](./TRANSLATIONS.md)**             | Internationalization (i18n) guide for adding new languages |
+| **[MACOS_RELEASE_PLAN.md](./MACOS_RELEASE_PLAN.md)** | Complete macOS release and distribution guide              |
+| **[MACOS_QUICKSTART.md](./MACOS_QUICKSTART.md)**     | Quick start guide for macOS builds                         |
+| **[FLATHUB_SUBMISSION.md](./FLATHUB_SUBMISSION.md)** | Linux Flatpak packaging and distribution                   |
+| **[entitlements.plist](./entitlements.plist)**       | macOS entitlements configuration                           |
+| **[logo.png](./logo.png)**                           | AeroFTP official logo                                      |
 
 ---
 
 ## 🚀 Quick Links
 
 ### For Release Process
-1. Start with **[MACOS_QUICKSTART.md](./MACOS_QUICKSTART.md)** - Immediate actions
-2. Follow **[MACOS_RELEASE_PLAN.md](./MACOS_RELEASE_PLAN.md)** - Complete process
-3. Reference **[CHANGELOG-OPENCODE.md](./CHANGELOG-OPENCODE.md)** - Recent changes
+1. Update version in `package.json`, `src-tauri/tauri.conf.json`, `snap/snapcraft.yaml`
+2. Update `CHANGELOG.md` in project root
+3. Follow platform-specific guides below
 
-### For Platform Specific
-- **macOS**: [MACOS_RELEASE_PLAN.md](./MACOS_RELEASE_PLAN.md), [MACOS_QUICKSTART.md](./MACOS_QUICKSTART.md)
-- **Linux**: [FLATHUB_SUBMISSION.md](./FLATHUB_SUBMISSION.md)
-- **Windows**: See [README.md](../README.md) for current status
-
----
-
-## 📝 Document Structure
-
-### Release Documentation
-- Plans and guides for distributing AeroFTP on different platforms
-- Build configurations
-- Signing and notarization procedures
-- Store submission processes
-
-### Changelogs
-- **[CHANGELOG.md](../CHANGELOG.md)** - Official project changelog
-- **[CHANGELOG-OPENCODE.md](./CHANGELOG-OPENCODE.md)** - Session-specific changelog (OpenCode)
-
-### Configuration Files
-- **[entitlements.plist](./entitlements.plist)** - macOS app permissions
-- Tauri configs in `src-tauri/tauri.conf.json`
-- Cargo.toml and package.json in project root
+### Platform Guides
+- **Linux**: [FLATHUB_SUBMISSION.md](./FLATHUB_SUBMISSION.md) | Snap: `snap/snapcraft.yaml`
+- **macOS**: [MACOS_RELEASE_PLAN.md](./MACOS_RELEASE_PLAN.md)
+- **Windows**: Automatic via GitHub Actions
 
 ---
 
-## 🎯 Recommended Workflow
+## 📝 Version Files
 
-When working on a new release:
+When releasing, update version in these 3 files:
 
-```
-1. Read docs/MACOS_QUICKSTART.md
-   ↓
-2. Update version numbers (3 files)
-   ↓
-3. Update CHANGELOG.md
-   ↓
-4. Test on target platform
-   ↓
-5. Follow docs/MACOS_RELEASE_PLAN.md
-   ↓
-6. Create git tag and release
-   ↓
-7. Update README.md with download links
-```
+1. `package.json` → `"version": "x.x.x"`
+2. `src-tauri/tauri.conf.json` → `"version": "x.x.x"`
+3. `snap/snapcraft.yaml` → `version: 'x.x.x'`
 
 ---
 
-## 📖 Additional Resources
+## 🌍 Translations
 
-### Tauri Documentation
-- [Tauri v2 Guide](https://v2.tauri.app/)
-- [macOS Signing](https://v2.tauri.app/distribute/sign-macos/)
-- [macOS Notarization](https://v2.tauri.app/distribute/notarize/)
-- [Mac App Store](https://v2.tauri.app/distribute/mac-app-store/)
+AeroFTP supports multiple languages. See [TRANSLATIONS.md](./TRANSLATIONS.md) for:
+- Adding a new language
+- Translation file structure
+- Contributing translations
 
-### Apple Documentation
-- [Notary Tool](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution)
-- [App Store Connect](https://appstoreconnect.apple.com/)
-- [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/)
-
----
-
-## 📝 Contributing to Documentation
-
-If you make changes to the codebase:
-
-1. Update relevant documentation files
-2. Add session notes to CHANGELOG-OPENCODE.md
-3. Update version-specific guides
-4. Test instructions before committing
+Currently supported: **English** (base), **Italian**
 
 ---
 
 ## 📅 Last Updated
 
-- **CHANGELOG-OPENCODE.md**: 2025-12-24 (Session: OpenCode)
-- **MACOS_RELEASE_PLAN.md**: 2025-12-24
-- **MACOS_QUICKSTART.md**: 2025-12-24
-- **entitlements.plist**: 2025-12-24
+- **Documentation Version**: 0.9.5
+- **Last Update**: 2026-01-15
 
 ---
 
-**Maintainer**: axpdev
-**Documentation Version**: 0.1.0
-**Project**: AeroFTP v0.7.0 (planned)
+**Maintainer**: axpnet  
+**Project**: [github.com/axpnet/aeroftp](https://github.com/axpnet/aeroftp)

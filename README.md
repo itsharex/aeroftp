@@ -96,7 +96,7 @@ sudo snap install aeroftp
 Download the latest release for your platform:
 - **Linux**: `.deb`, `.rpm`, `.AppImage`, or `.snap`
 - **Windows**: `.msi` installer or `.exe`
-- **macOS**: `.dmg` image (coming soon)
+- **macOS**: `.dmg` disk image
 
 ### Build from Source
 
