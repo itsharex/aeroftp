@@ -1,38 +1,39 @@
 name: aeroftp
 version: '0.9.6'
-summary: Modern FTP Client built with Tauri (Strict Snap - Limited Access)
+summary: Modern FTP Client - SNAP LIMITED DEMO (Use .deb/.AppImage for full access)
 description: |
   AeroFTP is a modern, open-source FTP client that combines beauty and functionality.
   
-  ⚠️  **SNAP VERSION LIMITATIONS** ⚠️
-  This Snap uses strict confinement which limits filesystem access.
-  You can ONLY access files in:
-  - ~/snap/aeroftp/common/
-  - ~/snap/aeroftp/current/
-  - Mounted removable media (if you connect the removable-media plug)
+  ⚠️  **SNAP VERSION - LIMITED DEMO** ⚠️
+  Due to Snap strict confinement restrictions (classic confinement not granted),
+  this version has LIMITED filesystem access:
+  - Can ONLY access: ~/snap/aeroftp/ and mounted removable media
+  - CANNOT access most system directories (/home, /var, etc.)
+  - Some features may not work as expected
   
-  💡 **FOR FULL FILESYSTEM ACCESS, USE:**
+  🔓 **FOR FULL UNRESTRICTED ACCESS, DOWNLOAD:**
   - .deb package (Debian/Ubuntu) - RECOMMENDED
   - .AppImage (Universal Linux) - RECOMMENDED
-  - .dmg (macOS)
-  - .msi/.exe (Windows)
+  - .dmg (macOS) / .msi (Windows)
+  👉 https://github.com/axpnet/aeroftp/releases
   
-  Download full versions: https://github.com/axpnet/aeroftp/releases
-  
-  **Features:**
-  - 🌍 Multi-language (EN, IT, ES, FR, ZH)
-  - 🚀 Fast transfers with real-time progress
-  - ☁️ AeroCloud file synchronization
-  - 🎨 Beautiful dark/light themes
-  - 📁 Dual-pane file browser
-  - 🔄 File sync with conflict detection
-  - 💻 DevTools (Editor, Terminal, AI Chat)
-  - 📜 Multi-session tabs
-  - 🔐 Secure FTPS connections
-  - 🎵 Media player & image preview
+  **Features (full version):**
+  🌍 Multi-language (EN, IT, ES, FR, ZH)
+  🚀 Fast transfers with real-time progress
+  ☁️ AeroCloud file synchronization
+  🎨 Beautiful dark/light themes
+  📁 Dual-pane file browser
+  🔄 File sync with conflict detection
+  💻 DevTools (Monaco Editor, Terminal, AI Chat)
+  📜 Multi-session tabs
+  🔐 Secure FTPS connections
+  🎵 Media player & image preview
   
   Built with Rust (Tauri) + React/TypeScript.
   Open source under GPL-3.0 license.
+  
+  Note: This is the same limitation affecting FileZilla and other FTP clients on Snap.
+  See: https://github.com/brlin-tw/filezilla-snap/issues/7
 
 base: core22
 grade: stable
