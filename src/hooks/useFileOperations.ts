@@ -92,7 +92,10 @@ export function useFileOperations({
                 const relativePath = response.current_path.startsWith(syncBasePaths.remote)
                     ? response.current_path.slice(syncBasePaths.remote.length)
                     : '';
-                const newLocalPath = syncBasePaths.local + relativePath;
+                // Join paths avoiding double slashes
+                const basePath = syncBasePaths.local.endsWith('/') ? syncBasePaths.local.slice(0, -1) : syncBasePaths.local;
+                const relPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+                const newLocalPath = relativePath ? basePath + relPath : basePath;
                 try {
                     const files: LocalFile[] = await invoke('get_local_files', { path: newLocalPath, showHidden: showHiddenFiles });
                     setLocalFiles(files);
@@ -116,7 +119,10 @@ export function useFileOperations({
             const relativePath = path.startsWith(syncBasePaths.local)
                 ? path.slice(syncBasePaths.local.length)
                 : '';
-            const newRemotePath = syncBasePaths.remote + relativePath;
+            // Join paths avoiding double slashes
+            const basePath = syncBasePaths.remote.endsWith('/') ? syncBasePaths.remote.slice(0, -1) : syncBasePaths.remote;
+            const relPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+            const newRemotePath = relativePath ? basePath + relPath : basePath;
             try {
                 const response: FileListResponse = await invoke('change_directory', { path: newRemotePath });
                 setRemoteFiles(response.files);

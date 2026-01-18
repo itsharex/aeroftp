@@ -56,7 +56,6 @@ import { SortableHeader, SortField, SortOrder } from './components/SortableHeade
 import ActivityLogPanel from './components/ActivityLogPanel';
 import { useActivityLog } from './hooks/useActivityLog';
 import { useHumanizedLog } from './hooks/useHumanizedLog';
-import SnapNoticeDialog, { useSnapNotice } from './components/SnapNoticeDialog';
 
 // ============ Main App ============
 const App: React.FC = () => {
@@ -319,7 +318,6 @@ const App: React.FC = () => {
   const contextMenu = useContextMenu();
   const humanLog = useHumanizedLog();
   const activityLog = useActivityLog();
-  const { showNotice: showSnapNotice, closeNotice: closeSnapNotice } = useSnapNotice();
 
   // FTP Keep-Alive: Send NOOP every 60 seconds to prevent connection timeout
   useEffect(() => {
@@ -634,9 +632,9 @@ const App: React.FC = () => {
       if (quickConnectDirs.localDir) {
         await changeLocalDirectory(quickConnectDirs.localDir);
       }
-    } catch (error) {
+    } catch (error) { 
       humanLog.logError('CONNECT', { server: connectionParams.server }, logId);
-      toast.error('Connection Failed', String(error));
+      toast.error('Connection Failed', String(error)); 
     }
     finally { setLoading(false); }
   };
@@ -691,13 +689,13 @@ const App: React.FC = () => {
     // Use functional update to capture current state correctly
     setSessions(prev => prev.map(s =>
       s.id === activeSessionId
-        ? {
-          ...s,
-          remoteFiles: [...remoteFiles],
-          localFiles: [...localFiles],
-          remotePath: currentRemotePath,
-          localPath: currentLocalPath
-        }
+        ? { 
+            ...s, 
+            remoteFiles: [...remoteFiles], 
+            localFiles: [...localFiles], 
+            remotePath: currentRemotePath, 
+            localPath: currentLocalPath 
+          }
         : s
     ));
 
@@ -717,20 +715,20 @@ const App: React.FC = () => {
       await invoke('connect_ftp', { params: session.connectionParams });
       await invoke('change_directory', { path: session.remotePath });
       setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connected' } : s));
-
+      
       // Refresh BOTH remote and local files with real data
       const response: FileListResponse = await invoke('list_files');
       setRemoteFiles(response.files);
       setCurrentRemotePath(response.current_path);
-
+      
       // Also refresh local files for this session's local path
-      const localFilesData: LocalFile[] = await invoke('get_local_files', {
-        path: session.localPath,
-        showHidden: showHiddenFiles
+      const localFilesData: LocalFile[] = await invoke('get_local_files', { 
+        path: session.localPath, 
+        showHidden: showHiddenFiles 
       });
       setLocalFiles(localFilesData);
       setCurrentLocalPath(session.localPath);
-
+      
     } catch (e) {
       console.log('Reconnect error:', e);
       setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'cached' } : s));
@@ -914,7 +912,10 @@ const App: React.FC = () => {
         const relativePath = response.current_path.startsWith(syncBasePaths.remote)
           ? response.current_path.slice(syncBasePaths.remote.length)
           : '';
-        const newLocalPath = syncBasePaths.local + relativePath;
+        // Join paths avoiding double slashes
+        const basePath = syncBasePaths.local.endsWith('/') ? syncBasePaths.local.slice(0, -1) : syncBasePaths.local;
+        const relPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+        const newLocalPath = relativePath ? basePath + relPath : basePath;
         // Check if local path exists
         try {
           const files: LocalFile[] = await invoke('get_local_files', { path: newLocalPath, showHidden: showHiddenFiles });
@@ -937,7 +938,10 @@ const App: React.FC = () => {
       const relativePath = path.startsWith(syncBasePaths.local)
         ? path.slice(syncBasePaths.local.length)
         : '';
-      const newRemotePath = syncBasePaths.remote + relativePath;
+      // Join paths avoiding double slashes
+      const basePath = syncBasePaths.remote.endsWith('/') ? syncBasePaths.remote.slice(0, -1) : syncBasePaths.remote;
+      const relPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+      const newRemotePath = relativePath ? basePath + relPath : basePath;
       // Check if remote path exists
       try {
         const response: FileListResponse = await invoke('change_directory', { path: newRemotePath });
@@ -1016,7 +1020,7 @@ const App: React.FC = () => {
           await invoke('download_file', { params });
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
           const sizeStr = fileSize ? formatBytes(fileSize) : '';
-          const msg = sizeStr
+          const msg = sizeStr 
             ? `📥 Got ${fileName} (${sizeStr}) in ${elapsed}s`
             : `📥 Got ${fileName} in ${elapsed}s`;
           humanLog.updateEntry(logId, { status: 'success', message: msg });
@@ -1024,9 +1028,9 @@ const App: React.FC = () => {
           humanLog.logError('DOWNLOAD', { filename: fileName }, logId);
         }
       }
-    } catch (error) {
+    } catch (error) { 
       humanLog.logError('DOWNLOAD', { filename: fileName }, logId);
-      toast.error('Download Failed', String(error));
+      toast.error('Download Failed', String(error)); 
     }
   };
 
@@ -1050,9 +1054,9 @@ const App: React.FC = () => {
           : `🚀 Uploaded ${fileName} in ${elapsed}s`;
         humanLog.updateEntry(logId, { status: 'success', message: msg });
       }
-    } catch (error) {
+    } catch (error) { 
       humanLog.logError('UPLOAD', { filename: fileName }, logId);
-      toast.error('Upload Failed', String(error));
+      toast.error('Upload Failed', String(error)); 
     }
   };
 
@@ -1311,8 +1315,8 @@ const App: React.FC = () => {
         for (const name of names) {
           const file = remoteFiles.find(f => f.name === name);
           if (file) {
-            try {
-              await invoke('delete_remote_file', { path: file.path, isDir: file.is_dir });
+            try { 
+              await invoke('delete_remote_file', { path: file.path, isDir: file.is_dir }); 
               if (file.is_dir) {
                 deletedFolders.push(name);
               } else {
@@ -1349,8 +1353,8 @@ const App: React.FC = () => {
         for (const name of names) {
           const file = localFiles.find(f => f.name === name);
           if (file) {
-            try {
-              await invoke('delete_local_file', { path: file.path });
+            try { 
+              await invoke('delete_local_file', { path: file.path }); 
               if (file.is_dir) {
                 deletedFolders.push(name);
               } else {
@@ -1387,9 +1391,9 @@ const App: React.FC = () => {
           toast.success('Deleted', fileName);
           await loadRemoteFiles();
         }
-        catch (error) {
+        catch (error) { 
           humanLog.logError('DELETE', { filename: fileName }, logId);
-          toast.error('Delete Failed', String(error));
+          toast.error('Delete Failed', String(error)); 
         }
       }
     });
@@ -1408,9 +1412,9 @@ const App: React.FC = () => {
           toast.success('Deleted', fileName);
           await loadLocalFiles(currentLocalPath);
         }
-        catch (error) {
+        catch (error) { 
           humanLog.logError('DELETE', { filename: fileName }, logId);
-          toast.error('Delete Failed', String(error));
+          toast.error('Delete Failed', String(error)); 
         }
       }
     });
@@ -1438,9 +1442,9 @@ const App: React.FC = () => {
           }
           humanLog.logSuccess('RENAME', { oldname: currentName, newname: newName }, logId);
           toast.success('Renamed', newName);
-        } catch (error) {
+        } catch (error) { 
           humanLog.logError('RENAME', { oldname: currentName, newname: newName }, logId);
-          toast.error('Rename Failed', String(error));
+          toast.error('Rename Failed', String(error)); 
         }
       }
     });
@@ -1467,9 +1471,9 @@ const App: React.FC = () => {
           }
           humanLog.logSuccess('MKDIR', { foldername: name }, logId);
           toast.success('Created', name);
-        } catch (error) {
+        } catch (error) { 
           humanLog.logError('MKDIR', { foldername: name }, logId);
-          toast.error('Create Failed', String(error));
+          toast.error('Create Failed', String(error)); 
         }
       }
     });
@@ -1557,7 +1561,6 @@ const App: React.FC = () => {
       {/* Native System Titlebar - CustomTitlebar removed for Linux compatibility */}
 
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
-      {showSnapNotice && <SnapNoticeDialog onClose={closeSnapNotice} />}
       <TransferQueue
         items={transferQueue.items}
         isVisible={transferQueue.isVisible}
