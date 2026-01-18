@@ -56,3 +56,4 @@ prime/
 .craft/
 overlay/
 flathub-fork/
+snapcraft.login
