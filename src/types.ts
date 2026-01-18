@@ -29,6 +29,16 @@ export interface UploadParams {
   remote_path: string;
 }
 
+export interface DownloadFolderParams {
+  remote_path: string;
+  local_path: string;
+}
+
+export interface UploadFolderParams {
+  local_path: string;
+  remote_path: string;
+}
+
 // Local file from filesystem (from backend)
 export interface LocalFile {
   name: string;

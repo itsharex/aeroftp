@@ -33,6 +33,19 @@
 - 💾 **Profiles** - Save your favorite server connections
 - 🔗 **Sync Navigation** - Keep remote/local directories in sync
 
+### Activity Log Panel 📋
+FileZilla-style real-time activity log with dual themes:
+
+| Theme          | Description                                    |
+| -------------- | ---------------------------------------------- |
+| **Professional** | Tokio Night-inspired elegant dark theme (default) |
+| **Cyber**        | Neon glow effects with CRT scanlines overlay    |
+
+- **Typewriter effect** for new log entries
+- **Humanized messages** in 5 languages (EN, IT, FR, ES, ZH)
+- **Badge counter** in StatusBar (0 → 99+)
+- Tracks: connections, uploads, downloads, navigation, deletes, AeroCloud sync
+
 ### DevTools Panel 🛠️
 AeroFTP includes an integrated DevTools panel (like Chrome DevTools) for web developers:
 

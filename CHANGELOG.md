@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.7] - 2026-01-17
+
+### Added
+- **Activity Log Panel** 📋: New FileZilla-style activity log with real-time operation tracking
+  - Typewriter animation effect for new log entries
+  - Live indicator with pulsing animation
+  - Auto-scroll with user scroll detection
+  - Clear all logs functionality
+  - **Badge counter** in StatusBar showing log count (0 → 99+)
+
+- **Dual Theme System** 🎨:
+  - **Professional** (default): Tokio Night/Antigravity-inspired elegant dark theme
+  - **Cyber** (optional): Neon glow effects with CRT scanlines overlay
+  - Theme toggle button in Activity Log header
+  - Glow effects on operation text only (CONNECT, UPLOAD, etc.) in cyber mode
+
+- **Humanized Log Messages** 🌍: Friendly, conversational log messages in 5 languages
+  - English, Italian, French, Spanish, Chinese
+  - Contextual messages with emojis (🚀 connection, 📁 navigation, ⬆️ upload, etc.)
+  - File size and transfer time displayed for uploads/downloads
+  - Smart pluralization and formatting
+
+- **Comprehensive Operation Logging**:
+  - Connection/disconnection with server details
+  - Upload/download with file size and duration
+  - Navigation (remote and local directories)
+  - File operations: delete, rename, mkdir
+  - Bulk delete operations with file count
+  - Tab close events
+  - Sync navigation toggle state
+  - AeroCloud sync status (syncing/completed/error) with SYNCED indicator
+  - Keep-alive timeout and reconnection events
+  - **Monaco Editor saves**: File edits now logged with size info
+
+### Fixed
+- **Multi-tab switching bug**: Switching between FTP sessions now correctly refreshes BOTH remote and local panels
+- **Keep-alive logging**: Timeout and reconnection events now properly logged with humanized messages
+- **TypeScript type safety**: All theme properties properly typed across professional and cyber themes
+- **Cloud sync log deduplication**: Added debounce to prevent duplicate log entries from React StrictMode
+
+### Changed
+- Activity Log is now closed by default (toggle via StatusBar)
+- DevTools panel moved below Activity Log in layout
+- Connection welcome messages simplified to "Benvenuto! 🚀 Connesso a {server}"
+
+---
+
 ## [0.9.5] - 2026-01-15
 
 ### Added

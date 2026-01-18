@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Globe, HardDrive, Wifi, WifiOff, Code, FolderSync, Cloud, ArrowUpDown } from 'lucide-react';
+import { Globe, HardDrive, Wifi, WifiOff, Code, FolderSync, Cloud, ArrowUpDown, ScrollText } from 'lucide-react';
 import { useTranslation } from '../i18n';
 
 interface StatusBarProps {
@@ -15,10 +15,13 @@ interface StatusBarProps {
     cloudSyncing?: boolean;
     transferQueueActive?: boolean;
     transferQueueCount?: number;
+    showActivityLog?: boolean;
+    activityLogCount?: number;
     onToggleDevTools?: () => void;
     onToggleSync?: () => void;
     onToggleCloud?: () => void;
     onToggleTransferQueue?: () => void;
+    onToggleActivityLog?: () => void;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -34,10 +37,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     cloudSyncing = false,
     transferQueueActive = false,
     transferQueueCount = 0,
+    showActivityLog = true,
+    activityLogCount = 0,
     onToggleDevTools,
     onToggleSync,
     onToggleCloud,
     onToggleTransferQueue,
+    onToggleActivityLog,
 }) => {
     const t = useTranslation();
 
@@ -149,6 +155,27 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                     >
                         <FolderSync size={12} />
                         <span>{t('statusBar.syncFiles')}</span>
+                    </button>
+                )}
+
+                {/* Activity Log Toggle */}
+                {onToggleActivityLog && (
+                    <button
+                        onClick={onToggleActivityLog}
+                        className={`flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors ${
+                            showActivityLog
+                                ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
+                                : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                        title="Activity Log"
+                    >
+                        <ScrollText size={12} />
+                        <span>Log</span>
+                        {activityLogCount > 0 && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500 text-white rounded-full min-w-[18px] text-center">
+                                {activityLogCount > 99 ? '99+' : activityLogCount}
+                            </span>
+                        )}
                     </button>
                 )}
 

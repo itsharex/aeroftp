@@ -16,5 +16,10 @@ export { useFileTransfer } from './useFileTransfer';
 export { useFileBrowser } from './useFileBrowser';
 export { useSessionManager } from './useSessionManager';
 
+// Activity Log
+export { useActivityLog, ActivityLogProvider } from './useActivityLog';
+export { useHumanizedLog } from './useHumanizedLog';
+export type { HumanizedLogParams, HumanizedOperationType } from './useHumanizedLog';
+
 // Re-export types for convenience
 export type { SortField, SortOrder } from './useFileBrowser';

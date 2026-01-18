@@ -50,3 +50,8 @@ src-tauri/gen/
 parts/
 stage/
 prime/
+
+# Flatpak
+.flatpak-builder/
+.craft/
+overlay/

@@ -52,10 +52,35 @@ Currently supported: **English** (base), **Italian**
 
 ---
 
+## 🆕 What's New in v0.9.6
+
+### Activity Log Panel
+FileZilla-style activity log with dual themes:
+- **Professional Theme**: Tokio Night-inspired elegant dark theme (default)
+- **Cyber Theme**: Neon glow effects with CRT scanlines
+- Typewriter animation for new entries
+- Humanized messages in 5 languages (EN, IT, FR, ES, ZH)
+- Badge counter in StatusBar
+
+### Operations Tracked
+| Operation | Icon | Description |
+|-----------|------|-------------|
+| CONNECT | 🔗 | Server connections with timestamp |
+| DISCONNECT | ⚡ | Session disconnections |
+| UPLOAD | ⬆️ | File uploads with size and duration |
+| DOWNLOAD | ⬇️ | File downloads with size and duration |
+| DELETE | 🗑️ | File and bulk deletions |
+| NAVIGATE | 📁 | Directory navigation (remote/local) |
+| MKDIR | 📂 | New folder creation |
+| RENAME | ✏️ | File/folder renaming |
+| SYNC | ☁️ | AeroCloud sync events |
+
+---
+
 ## 📅 Last Updated
 
-- **Documentation Version**: 0.9.5
-- **Last Update**: 2026-01-15
+- **Documentation Version**: 0.9.7
+- **Last Update**: 2026-01-17
 
 ---
 

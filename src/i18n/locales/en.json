@@ -136,7 +136,13 @@
             "clearCompleted": "Clear Completed",
             "cancelAll": "Cancel All",
             "pauseAll": "Pause All",
-            "resumeAll": "Resume All"
+            "resumeAll": "Resume All",
+            "activityLog": "Activity Log",
+            "noActivity": "No activity yet",
+            "clearLog": "Clear Log",
+            "jumpToLatest": "Jump to latest",
+            "running": "running",
+            "entries": "entries"
         },
         "settings": {
             "title": "Settings",
