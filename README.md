@@ -39,7 +39,7 @@
 - ☁️ **AeroCloud** - Cloud file synchronization with conflict detection
 
 ### Activity Log Panel 📋
-FileZilla-style real-time activity log with dual themes:
+Real-time activity log with dual themes:
 
 | Theme          | Description                                    |
 | -------------- | ---------------------------------------------- |
