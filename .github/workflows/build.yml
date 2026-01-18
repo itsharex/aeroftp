@@ -63,8 +63,12 @@ jobs:
         run: npm run tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Only needed if building snap, but good to have available
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+
+      # Build Snap package using Snapcraft (Tauri doesn't generate .snap)
+      - name: Build Snap package
+        if: startsWith(github.ref, 'refs/tags/') && matrix.target == 'linux'
+        uses: snapcore/action-build@v1
+        id: snap-build
 
       # Upload directly to GitHub Release (only on tags)
       # Each platform uploads its own binaries - no intermediate artifacts needed
@@ -95,7 +99,7 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/rpm/*.rpm
             src-tauri/target/release/bundle/appimage/*.AppImage
-            src-tauri/target/release/bundle/snap/*.snap
+            ${{ steps.snap-build.outputs.snap }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -105,13 +109,13 @@ jobs:
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
-          SNAP_FILE=$(ls src-tauri/target/release/bundle/snap/*.snap | head -n 1)
-          if [ -f "$SNAP_FILE" ]; then
-            echo "Uploading $SNAP_FILE..."
+          SNAP_FILE="${{ steps.snap-build.outputs.snap }}"
+          if [ -n "$SNAP_FILE" ] && [ -f "$SNAP_FILE" ]; then
+            echo "Uploading $SNAP_FILE to Snap Store..."
             snapcraft upload --release=stable "$SNAP_FILE"
           else
-            echo "Error: No snap file found!"
-            exit 1
+            echo "Warning: Snap file not found, skipping Snap Store upload"
+            echo "This is non-fatal - other packages will still be released"
           fi
 
       - name: Upload Windows binaries to Release
