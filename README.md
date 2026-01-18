@@ -1,4 +1,4 @@
-# ✈️ AeroFTP
+# 🚀 AeroFTP
 
 <p align="center">
   <img src="docs/logo.png" alt="AeroFTP Logo" width="128" height="128">
@@ -15,7 +15,11 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-blue" alt="Platform">
   <img src="https://img.shields.io/badge/Built%20with-Tauri%20%2B%20React-purple" alt="Built with">
-  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/License-GPL--3.0-green" alt="License">
+</p>
+
+<p align="center">
+  <a href="https://snapcraft.io/aeroftp"><img src="https://snapcraft.io/static/images/badges/en/snap-store-black.svg" alt="Get it from the Snap Store"></a>
 </p>
 
 ---
@@ -23,8 +27,8 @@
 ## ✨ Features
 
 ### Core
-- 🚀 **Lightning Fast** - Built with Rust for maximum performance
-- 🎨 **Beautiful UI** - Apple-inspired design with glass morphism effects
+- 🚀 **Lightning Fast** - Built with Rust for optimal performance
+- 🎨 **Beautiful UI** - Modern design with glass morphism effects
 - 🌙 **Dark Mode** - Full dark mode support with smooth transitions
 - 📁 **Dual Panel** - Remote and local file browsing side by side
 - 🔄 **File Sync** - Compare and synchronize local/remote directories
@@ -32,13 +36,14 @@
 - ⚡ **Async** - Non-blocking file transfers with progress tracking
 - 💾 **Profiles** - Save your favorite server connections
 - 🔗 **Sync Navigation** - Keep remote/local directories in sync
+- ☁️ **AeroCloud** - Cloud file synchronization with conflict detection
 
 ### Activity Log Panel 📋
 FileZilla-style real-time activity log with dual themes:
 
 | Theme          | Description                                    |
 | -------------- | ---------------------------------------------- |
-| **Professional** | Tokio Night-inspired elegant dark theme (default) |
+| **Professional** | Tokyo Night-inspired elegant dark theme (default) |
 | **Cyber**        | Neon glow effects with CRT scanlines overlay    |
 
 - **Typewriter effect** for new log entries
@@ -58,7 +63,7 @@ AeroFTP includes an integrated DevTools panel (like Chrome DevTools) for web dev
 #### Editor Features
 - Full **Monaco Editor** (same as VS Code)
 - **Syntax highlighting** for 20+ languages
-- **Tokyo Night** 🌃 theme (in honor of Antigravity)
+- **Tokyo Night** 🌃 theme
 - **Save** directly to server (auto-upload on save)
 - **Reset** to undo changes
 - Minimap, line numbers, folding, bracket colorization
@@ -84,25 +89,38 @@ Integrated AI-powered assistant for intelligent FTP operations:
 - **Temperature**: Control response randomness (0.0 - 2.0)
 - **Max Tokens**: Limit response length (256 - 32768)
 
+### 🎵 Media Features
+- **Image Preview** - View images directly in the app
+- **Audio/Video Player** - Play media files with playback controls
+- **File Thumbnails** - Visual thumbnails for image files
+
+### 🌍 Internationalization
+- **5 Languages**: English, Italian, French, Spanish, Chinese
+- **Easy switching** from settings panel
+
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="docs/screenshot-light.png" alt="AeroFTP Light Mode" width="800">
+  <img src="docs/screenshots/screenshot-1.png" alt="AeroFTP Screenshot 1" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/screenshot-dark.png" alt="AeroFTP Dark Mode" width="800">
+  <img src="docs/screenshots/screenshot-2.png" alt="AeroFTP Screenshot 2" width="800">
 </p>
 
 ## 🛠️ Installation
 
-### Snap Store (Recommended for Linux)
+### Snap Store (Linux)
 
 ```bash
 sudo snap install aeroftp
 ```
 
-[![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/aeroftp)
+> ⚠️ **Note**: The Snap version has limited filesystem access due to strict confinement. For full access, use the `.deb` or `.AppImage` versions.
+
+### Flathub (Coming Soon)
+
+AeroFTP is currently under review for Flathub. Stay tuned!
 
 ### From Releases
 
@@ -110,6 +128,8 @@ Download the latest release for your platform:
 - **Linux**: `.deb`, `.rpm`, `.AppImage`, or `.snap`
 - **Windows**: `.msi` installer or `.exe`
 - **macOS**: `.dmg` disk image
+
+📥 [Download from GitHub Releases](https://github.com/axpnet/aeroftp/releases)
 
 ### Build from Source
 
@@ -166,11 +186,11 @@ npm run tauri build
 
 ## 🏗️ Tech Stack
 
-- **Backend**: Rust + Tauri
-- **Frontend**: React + TypeScript
+- **Backend**: Rust + Tauri 2.0
+- **Frontend**: React 18 + TypeScript
 - **Styling**: TailwindCSS
 - **FTP**: suppaftp crate
-- **Editor**: Monaco Editor (VS Code)
+- **Editor**: Monaco Editor
 - **Icons**: Lucide React
 
 ## 🤝 Contributing
@@ -179,15 +199,14 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 ## 📝 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+GPL-3.0 License - see [LICENSE](LICENSE) for details.
 
 ## 👥 Credits
 
 > **🤖 AI-Assisted Development Project**
-> - **Lead Developer & Supervisor:** axpdev
-> - **Architect & Tech Lead:** Gemini 3 Pro (AI)
-> - **Initial Execution:** KIMI K2 (AI)
-> - **Refinement & Finalization:** Claude Opus 4.5 via Antigravity (AI)
+>
+> - **Lead Developer**: [axpdev](https://github.com/axpnet)
+> - **AI Assistant**: Claude Opus 4.5
 
 ---
 
