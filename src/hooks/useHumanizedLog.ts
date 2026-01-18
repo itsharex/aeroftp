@@ -351,12 +351,13 @@ export interface HumanizedLogParams {
     percent?: number;
     speed?: string;
     isRemote?: boolean;
+    size?: number;
 }
 
-export type HumanizedOperationType = 
-    | 'CONNECT' | 'DISCONNECT' 
-    | 'UPLOAD' | 'DOWNLOAD' 
-    | 'DELETE' | 'RENAME' | 'MKDIR' 
+export type HumanizedOperationType =
+    | 'CONNECT' | 'DISCONNECT'
+    | 'UPLOAD' | 'DOWNLOAD'
+    | 'DELETE' | 'RENAME' | 'MKDIR'
     | 'NAVIGATE'
     | 'DELETE_MULTIPLE' | 'UPLOAD_MULTIPLE' | 'DOWNLOAD_MULTIPLE';
 
@@ -374,7 +375,7 @@ export function useHumanizedLog() {
     ): string => {
         const lang = HUMANIZED_MESSAGES[language] || HUMANIZED_MESSAGES['en'];
         const opMessages = lang[operation] || HUMANIZED_MESSAGES['en'][operation];
-        
+
         if (!opMessages || !opMessages[phase]) {
             // Fallback to English
             const fallback = HUMANIZED_MESSAGES['en'][operation];
@@ -392,22 +393,22 @@ export function useHumanizedLog() {
      */
     const buildVars = (params: HumanizedLogParams, lang: string): Record<string, string | number> => {
         const vars: Record<string, string | number> = { ...params } as Record<string, string | number>;
-        
+
         // Add formatted folder/file counts
         if (params.folders !== undefined) {
             const folderWord = lang === 'it' ? (params.folders === 1 ? 'cartella' : 'cartelle') :
-                              lang === 'fr' ? (params.folders === 1 ? 'dossier' : 'dossiers') :
-                              lang === 'es' ? (params.folders === 1 ? 'carpeta' : 'carpetas') :
-                              lang === 'zh' ? '个文件夹' :
-                              (params.folders === 1 ? 'folder' : 'folders');
+                lang === 'fr' ? (params.folders === 1 ? 'dossier' : 'dossiers') :
+                    lang === 'es' ? (params.folders === 1 ? 'carpeta' : 'carpetas') :
+                        lang === 'zh' ? '个文件夹' :
+                            (params.folders === 1 ? 'folder' : 'folders');
             vars.folders = lang === 'zh' ? `${params.folders}${folderWord}` : pluralize(params.folders, folderWord, folderWord);
         }
-        
+
         if (params.files !== undefined) {
             const fileWord = lang === 'it' ? (params.files === 1 ? 'file' : 'file') :
-                            lang === 'fr' ? (params.files === 1 ? 'fichier' : 'fichiers') :
-                            lang === 'es' ? (params.files === 1 ? 'archivo' : 'archivos') :
-                            lang === 'zh' ? '个文件' :
+                lang === 'fr' ? (params.files === 1 ? 'fichier' : 'fichiers') :
+                    lang === 'es' ? (params.files === 1 ? 'archivo' : 'archivos') :
+                        lang === 'zh' ? '个文件' :
                             (params.files === 1 ? 'file' : 'files');
             vars.files = lang === 'zh' ? `${params.files}${fileWord}` : pluralize(params.files, fileWord, fileWord);
         }
@@ -437,7 +438,7 @@ export function useHumanizedLog() {
     ): string => {
         const message = getMessage(operation, 'success', params);
         const opType = operation.includes('_') ? operation.split('_')[0] as OperationType : operation as OperationType;
-        
+
         if (existingId) {
             activityLog.updateEntry(existingId, { status: 'success', message });
             return existingId;
@@ -455,7 +456,7 @@ export function useHumanizedLog() {
     ): string => {
         const message = getMessage(operation, 'error', params);
         const opType = operation.includes('_') ? operation.split('_')[0] as OperationType : operation as OperationType;
-        
+
         if (existingId) {
             activityLog.updateEntry(existingId, { status: 'error', message });
             return existingId;
