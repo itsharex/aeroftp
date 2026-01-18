@@ -104,11 +104,11 @@ Download for your platform:
 - **Windows**: `.msi`, `.exe`
 - **macOS**: `.dmg`
 
-📥 [Download from GitHub Releases](https://github.com/AXP-dev-tech/aeroftp/releases)
+📥 [Download from GitHub Releases](https://github.com/axpnet/aeroftp/releases)
 
 ### Build from Source
 ```bash
-git clone https://github.com/AXP-dev-tech/aeroftp.git
+git clone https://github.com/axpnet/aeroftp.git
 cd aeroftp
 npm install
 npm run tauri build
@@ -172,7 +172,7 @@ GPL-3.0 - see [LICENSE](LICENSE)
 ## 👥 Credits
 
 > **🤖 AI-Assisted Development**
-> - **Lead Developer**: [AXP-dev-tech](https://github.com/AXP-dev-tech)
+> - **Lead Developer**: [Axpdev](https://github.com/axpnet)
 > - **AI Assistant**: Claude (Anthropic)
 
 ---
