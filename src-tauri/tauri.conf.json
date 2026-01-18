@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "AeroFTP",
   "version": "0.9.8",
-  "identifier": "com.aeroftp.app",
+  "identifier": "com.aeroftp.AeroFTP",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
