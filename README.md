@@ -1,7 +1,7 @@
 # 🚀 AeroFTP
 
 <p align="center">
-  <img src="icons/icon.png" alt="AeroFTP Logo" width="128" height="128">
+  <img src="icons/AeroFTP_simbol_color_512x512.png" alt="AeroFTP Logo" width="128" height="128">
 </p>
 
 <p align="center">
