@@ -6,7 +6,8 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir, downloadDir } from '@tauri-apps/api/path';
 import {
   FileListResponse, ConnectionParams, DownloadParams, UploadParams,
-  LocalFile, TransferEvent, TransferProgress, RemoteFile, FtpSession
+  LocalFile, TransferEvent, TransferProgress, RemoteFile, FtpSession,
+  ProviderType, isOAuthProvider
 } from './types';
 
 interface DownloadFolderParams {
@@ -61,11 +62,7 @@ import { useHumanizedLog } from './hooks/useHumanizedLog';
 const App: React.FC = () => {
   const SETTINGS_KEY = 'aeroftp_settings';
 
-  interface ConnectionParams {
-    server: string;
-    username: string;
-    password: string;
-  }
+  // Using ConnectionParams from types.ts (includes protocol, port, options)
 
   const [isConnected, setIsConnected] = useState(false);
   const [remoteFiles, setRemoteFiles] = useState<RemoteFile[]>([]);
@@ -104,8 +101,8 @@ const App: React.FC = () => {
   const [cloudLocalFolder, setCloudLocalFolder] = useState<string>('');  // Cloud local folder path
   const [cloudRemoteFolder, setCloudRemoteFolder] = useState<string>('');  // Cloud remote folder path
   const [showConnectionScreen, setShowConnectionScreen] = useState(true);  // Initial connection screen, can be skipped
-  const [showMenuBar, setShowMenuBar] = useState(true);  // Internal header visibility
-  const [systemMenuVisible, setSystemMenuVisible] = useState(true);  // Native system menu bar
+  const [showMenuBar, setShowMenuBar] = useState(true);  // Internal header visibility (with logo and theme toggle)
+  const [systemMenuVisible, setSystemMenuVisible] = useState(false);  // Native system menu bar (File, Edit, View, Help) - hidden by default
   const [compactMode, setCompactMode] = useState(false);  // Compact UI mode
   const [showHiddenFiles, setShowHiddenFiles] = useState(true);  // Developer-first: show all files by default
   const [isSyncNavigation, setIsSyncNavigation] = useState(false); // Navigation Sync feature
@@ -119,7 +116,7 @@ const App: React.FC = () => {
 
   // Transfer Queue (unified upload + download)
   const transferQueue = useTransferQueue();
-  
+
   // Mapping from backend transfer_id to queue item id (for folder progress updates)
   const transferIdToQueueId = React.useRef<Map<string, string>>(new Map());
 
@@ -188,21 +185,21 @@ const App: React.FC = () => {
   // Returns true if they match (or we can't determine), false if mismatch
   const isLocalPathCoherent = React.useMemo(() => {
     if (!isConnected || !connectionParams.server || !currentLocalPath) return true;
-    
+
     // Extract server name without 'ftp.' prefix and port
     // e.g., "ftp.ericsolar.it:21" -> "ericsolar"
     const serverHost = connectionParams.server.split(':')[0]; // Remove port
     const serverName = serverHost.replace(/^ftp\./, '').replace(/^www\./, ''); // Remove ftp./www.
     const serverBase = serverName.split('.')[0]; // Get first part (e.g., "ericsolar" from "ericsolar.it")
-    
+
     // Check if local path contains a reference to a different server
     // Common patterns: /var/www/html/www.ericsolar.it, /home/user/ericsolar, etc.
     const localPathLower = currentLocalPath.toLowerCase();
     const serverBaseLower = serverBase.toLowerCase();
-    
+
     // If local path contains the server name, it's coherent
     if (localPathLower.includes(serverBaseLower)) return true;
-    
+
     // Check if local path contains ANY known server pattern that doesn't match
     // Look for patterns like "www.something.it" or "something.it" in path
     const pathParts = currentLocalPath.split('/');
@@ -214,7 +211,7 @@ const App: React.FC = () => {
         if (pathDomain !== serverBaseLower) return false;
       }
     }
-    
+
     // Default: assume coherent if we can't determine otherwise
     return true;
   }, [isConnected, connectionParams.server, currentLocalPath]);
@@ -301,16 +298,17 @@ const App: React.FC = () => {
 
   // Init System Menu and Theme on Mount
   useEffect(() => {
-    // Menu Visibility
+    // Menu Visibility - Default hidden for cleaner UI
     try {
       const savedSettings = localStorage.getItem(SETTINGS_KEY);
-      let showMenu = true; // Default visible (Safe Mode)
+      let showMenu = false; // Default hidden for cleaner look
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
         if (typeof parsed.showSystemMenu === 'boolean') {
           showMenu = parsed.showSystemMenu;
         }
       }
+      setSystemMenuVisible(showMenu);
       invoke('toggle_menu_bar', { visible: showMenu });
 
       // Load compact mode setting and show hidden files setting
@@ -321,6 +319,9 @@ const App: React.FC = () => {
         }
         if (typeof parsed.showHiddenFiles === 'boolean') {
           setShowHiddenFiles(parsed.showHiddenFiles);
+        }
+        if (typeof parsed.showToastNotifications === 'boolean') {
+          setShowToastNotifications(parsed.showToastNotifications);
         }
       }
     } catch (e) {
@@ -338,6 +339,9 @@ const App: React.FC = () => {
           }
           if (typeof parsed.showHiddenFiles === 'boolean') {
             setShowHiddenFiles(parsed.showHiddenFiles);
+          }
+          if (typeof parsed.showToastNotifications === 'boolean') {
+            setShowToastNotifications(parsed.showToastNotifications);
           }
         }
       } catch (e) { }
@@ -357,9 +361,43 @@ const App: React.FC = () => {
   const humanLog = useHumanizedLog();
   const activityLog = useActivityLog();
 
+  // Show toast notifications setting (default: false - toasts disabled)
+  const [showToastNotifications, setShowToastNotifications] = useState(false);
+
+  // Wrapper: Notify user with ActivityLog always, toast only if enabled
+  // Returns toast ID for compatibility with removeToast
+  const notify = React.useMemo(() => ({
+    success: (title: string, message?: string): string | null => {
+      activityLog.log('SUCCESS', message ? `${title}: ${message}` : title, 'success');
+      return showToastNotifications ? toast.success(title, message) : null;
+    },
+    error: (title: string, message?: string): string => {
+      activityLog.log('ERROR', message ? `${title}: ${message}` : title, 'error');
+      // Errors always show as toast (critical)
+      return toast.error(title, message);
+    },
+    info: (title: string, message?: string): string | null => {
+      activityLog.log('INFO', message ? `${title}: ${message}` : title, 'success');
+      return showToastNotifications ? toast.info(title, message) : null;
+    },
+    warning: (title: string, message?: string): string | null => {
+      activityLog.log('INFO', message ? `⚠️ ${title}: ${message}` : `⚠️ ${title}`, 'running');
+      return showToastNotifications ? toast.warning(title, message) : null;
+    }
+  }), [showToastNotifications, toast, activityLog]);
+
   // FTP Keep-Alive: Send NOOP every 60 seconds to prevent connection timeout
+  // Skip for OAuth providers as they don't need keep-alive
   useEffect(() => {
     if (!isConnected) return;
+
+    // Skip keep-alive for OAuth providers
+    const protocol = connectionParams.protocol;
+    const isOAuth = protocol && ['googledrive', 'dropbox', 'onedrive'].includes(protocol);
+    if (isOAuth) {
+      console.log('[Keep-Alive] Skipping for OAuth provider:', protocol);
+      return;
+    }
 
     const KEEP_ALIVE_INTERVAL = 60000; // 60 seconds
 
@@ -372,12 +410,12 @@ const App: React.FC = () => {
         // Connection lost - attempt auto-reconnect
         setIsReconnecting(true);
         humanLog.log('DISCONNECT', '⚠️ Connection lost - server timeout', 'error');
-        toast.info('Reconnecting...', 'Connection lost, attempting to reconnect');
+        notify.info('Reconnecting...', 'Connection lost, attempting to reconnect');
 
         try {
           await invoke('reconnect_ftp');
           humanLog.log('CONNECT', `✅ Back online! Reconnected to ${connectionParams.server}`, 'success');
-          toast.success('Reconnected', 'FTP connection restored');
+          notify.success('Reconnected', 'FTP connection restored');
           // Refresh file list after reconnection
           const response = await invoke<{ files: RemoteFile[]; current_path: string }>('list_files');
           setRemoteFiles(response.files);
@@ -385,7 +423,7 @@ const App: React.FC = () => {
         } catch (reconnectError) {
           console.error('Auto-reconnect failed:', reconnectError);
           humanLog.log('DISCONNECT', '❌ Couldn\'t reconnect - please connect manually', 'error');
-          toast.error('Connection Lost', 'Could not reconnect. Please reconnect manually.');
+          notify.error('Connection Lost', 'Could not reconnect. Please reconnect manually.');
           setIsConnected(false);
         } finally {
           setIsReconnecting(false);
@@ -395,7 +433,7 @@ const App: React.FC = () => {
 
     return () => clearInterval(keepAliveInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, connectionParams.server]);
+  }, [isConnected, connectionParams.server, connectionParams.protocol]);
 
   // Sorting
   const sortFiles = <T extends { name: string; size: number | null; modified: string | null; is_dir: boolean }>(files: T[], field: SortField, order: SortOrder): T[] => {
@@ -424,21 +462,21 @@ const App: React.FC = () => {
     if (localSortField === field) setLocalSortOrder(localSortOrder === 'asc' ? 'desc' : 'asc');
     else { setLocalSortField(field); setLocalSortOrder('asc'); }
   };
-  
+
   // Timeout to auto-hide transfer popup if stuck (30 seconds of no updates)
   const lastProgressUpdate = React.useRef<number>(Date.now());
   useEffect(() => {
     if (!activeTransfer) return;
-    
+
     lastProgressUpdate.current = Date.now();
-    
+
     const checkStuck = setInterval(() => {
       if (Date.now() - lastProgressUpdate.current > 30000) {
         console.warn('Transfer popup stuck, auto-closing');
         setActiveTransfer(null);
       }
     }, 5000);
-    
+
     return () => clearInterval(checkStuck);
   }, [activeTransfer?.percentage]);
 
@@ -446,15 +484,15 @@ const App: React.FC = () => {
   useEffect(() => {
     const unlisten = listen<TransferEvent>('transfer_event', (event) => {
       const data = event.payload;
-      const locationLabel = data.direction === 'local' ? '🖥️' : data.direction === 'remote' ? '🌐' : 
-                           data.direction === 'download' ? '⬇️' : '⬆️';
-      
+      const locationLabel = data.direction === 'local' ? '🖥️' : data.direction === 'remote' ? '🌐' :
+        data.direction === 'download' ? '⬇️' : '⬆️';
+
       // ========== TRANSFER EVENTS (download/upload) ==========
       if (data.event_type === 'start') {
         // Folder scan started - find and update queue item
-        activityLog.log(data.direction === 'download' ? 'DOWNLOAD' : 'UPLOAD', 
+        activityLog.log(data.direction === 'download' ? 'DOWNLOAD' : 'UPLOAD',
           `${locationLabel} ${data.message || data.filename}`, 'running');
-        
+
         // Try to match with queue item by filename and mark as folder
         const queueItem = transferQueue.items.find(i => i.filename === data.filename && i.status === 'pending');
         if (queueItem) {
@@ -475,7 +513,7 @@ const App: React.FC = () => {
         activityLog.log('ERROR', `${locationLabel} ✗ ${data.filename}`, 'error', data.message);
       } else if (data.event_type === 'progress' && data.progress) {
         setActiveTransfer(data.progress);
-        
+
         // Update folder queue item with file count progress (only for folder transfers)
         // Folder transfers have transfer_id like "dl-folder-..." or "ul-folder-..."
         if (data.transfer_id.includes('folder')) {
@@ -487,33 +525,33 @@ const App: React.FC = () => {
       } else if (data.event_type === 'complete') {
         setActiveTransfer(null);
         activityLog.log('SUCCESS', `${locationLabel} ${data.message || data.filename}`, 'success');
-        
+
         // Complete the queue item
         const queueId = transferIdToQueueId.current.get(data.transfer_id);
         if (queueId) {
           transferQueue.completeTransfer(queueId);
           transferIdToQueueId.current.delete(data.transfer_id);
         }
-        
+
         if (data.direction === 'upload') loadRemoteFiles();
         else if (data.direction === 'download') loadLocalFiles(currentLocalPath);
       } else if (data.event_type === 'error') {
         setActiveTransfer(null);
         activityLog.log('ERROR', `${data.message}`, 'error');
-        
+
         // Fail the queue item
         const queueId = transferIdToQueueId.current.get(data.transfer_id);
         if (queueId) {
           transferQueue.failTransfer(queueId, data.message || 'Transfer failed');
           transferIdToQueueId.current.delete(data.transfer_id);
         }
-        
-        toast.error('Transfer Failed', data.message);
+
+        notify.error('Transfer Failed', data.message);
       } else if (data.event_type === 'cancelled') {
         setActiveTransfer(null);
-        toast.warning('Transfer Cancelled', data.message);
+        notify.warning('Transfer Cancelled', data.message);
       }
-      
+
       // ========== DELETE EVENTS ==========
       else if (data.event_type === 'delete_start') {
         // Folder delete scan started
@@ -584,17 +622,30 @@ const App: React.FC = () => {
       setLocalFiles(files);
       setCurrentLocalPath(path);
     } catch (error) {
-      toast.error('Error', `Failed to list local files: ${error}`);
+      notify.error('Error', `Failed to list local files: ${error}`);
     }
   }, [showHiddenFiles]);
 
-  const loadRemoteFiles = async () => {
+  const loadRemoteFiles = async (overrideProtocol?: string) => {
     try {
-      const response: FileListResponse = await invoke('list_files');
+      // Check if we're connected to an OAuth provider
+      // Use override protocol if provided (for cases where state isn't updated yet)
+      const protocol = overrideProtocol || connectionParams.protocol;
+      const isOAuth = protocol && ['googledrive', 'dropbox', 'onedrive'].includes(protocol);
+      console.log('[loadRemoteFiles] protocol:', protocol, 'isOAuth:', isOAuth, 'override:', overrideProtocol);
+
+      let response: FileListResponse;
+      if (isOAuth) {
+        // Use provider API for OAuth
+        response = await invoke('provider_list_files', { path: null });
+      } else {
+        // Use FTP API
+        response = await invoke('list_files');
+      }
       setRemoteFiles(response.files);
       setCurrentRemotePath(response.current_path);
     } catch (error) {
-      toast.error('Error', `Failed to list files: ${error}`);
+      notify.error('Error', `Failed to list files: ${error}`);
     }
   };
 
@@ -744,7 +795,38 @@ const App: React.FC = () => {
 
   // FTP operations
   const connectToFtp = async () => {
-    if (!connectionParams.server || !connectionParams.username) { toast.error('Missing Fields', 'Please fill in server and username'); return; }
+    // OAuth providers don't need server/username validation - they're already connected
+    const protocol = connectionParams.protocol;
+    console.log('[connectToFtp] connectionParams:', connectionParams);
+    console.log('[connectToFtp] protocol:', protocol);
+    const isOAuth = protocol && ['googledrive', 'dropbox', 'onedrive'].includes(protocol);
+    console.log('[connectToFtp] isOAuth:', isOAuth);
+
+    if (isOAuth) {
+      // OAuth provider is already connected via OAuthConnect component
+      // Just switch to file manager view
+      setIsConnected(true);
+      setLoading(false);
+      setShowConnectionScreen(false);
+      const providerName = protocol === 'googledrive' ? 'Google Drive' : protocol === 'dropbox' ? 'Dropbox' : 'OneDrive';
+      notify.success('Connected', `Connected to ${providerName}`);
+      // Load remote files for OAuth provider - pass protocol explicitly
+      await loadRemoteFiles(protocol);
+      // Navigate to initial local directory if specified
+      if (quickConnectDirs.localDir) {
+        await changeLocalDirectory(quickConnectDirs.localDir);
+      }
+      // Create session with provider name
+      createSession(
+        providerName,
+        connectionParams,
+        '/',
+        quickConnectDirs.localDir || currentLocalPath
+      );
+      return;
+    }
+
+    if (!connectionParams.server || !connectionParams.username) { notify.error('Missing Fields', 'Please fill in server and username'); return; }
     setLoading(true);
     // Reset navigation sync for new connection
     setIsSyncNavigation(false);
@@ -754,7 +836,7 @@ const App: React.FC = () => {
       await invoke('connect_ftp', { params: connectionParams });
       setIsConnected(true);
       humanLog.logSuccess('CONNECT', { server: connectionParams.server }, logId);
-      toast.success('Connected', `Connected to ${connectionParams.server}`);
+      notify.success('Connected', `Connected to ${connectionParams.server}`);
       // Navigate to initial remote directory if specified
       if (quickConnectDirs.remoteDir) {
         await changeRemoteDirectory(quickConnectDirs.remoteDir);
@@ -765,9 +847,9 @@ const App: React.FC = () => {
       if (quickConnectDirs.localDir) {
         await changeLocalDirectory(quickConnectDirs.localDir);
       }
-    } catch (error) { 
+    } catch (error) {
       humanLog.logError('CONNECT', { server: connectionParams.server }, logId);
-      toast.error('Connection Failed', String(error)); 
+      notify.error('Connection Failed', String(error));
     }
     finally { setLoading(false); }
   };
@@ -786,10 +868,10 @@ const App: React.FC = () => {
       setDevToolsOpen(false);
       setDevToolsPreviewFile(null);
       humanLog.logSuccess('DISCONNECT', {}, logId);
-      toast.info('Disconnected', 'Disconnected from server');
+      notify.info('Disconnected', 'Disconnected from server');
     } catch (error) {
       humanLog.logError('DISCONNECT', {}, logId);
-      toast.error('Error', `Disconnection failed: ${error}`);
+      notify.error('Error', `Disconnection failed: ${error}`);
     }
   };
 
@@ -836,15 +918,15 @@ const App: React.FC = () => {
     // Save current session state before switching (including sync navigation state)
     setSessions(prev => prev.map(s =>
       s.id === activeSessionId
-        ? { 
-            ...s, 
-            remoteFiles: capturedRemoteFiles, 
-            localFiles: capturedLocalFiles, 
-            remotePath: capturedRemotePath, 
-            localPath: capturedLocalPath,
-            isSyncNavigation: capturedSyncNav,
-            syncBasePaths: capturedSyncPaths
-          }
+        ? {
+          ...s,
+          remoteFiles: capturedRemoteFiles,
+          localFiles: capturedLocalFiles,
+          remotePath: capturedRemotePath,
+          localPath: capturedLocalPath,
+          isSyncNavigation: capturedSyncNav,
+          syncBasePaths: capturedSyncPaths
+        }
         : s
     ));
 
@@ -857,7 +939,7 @@ const App: React.FC = () => {
     setCurrentRemotePath(targetSession.remotePath);
     setCurrentLocalPath(targetSession.localPath);
     setConnectionParams(targetSession.connectionParams);
-    
+
     // Restore per-session navigation sync state
     setIsSyncNavigation(targetSession.isSyncNavigation ?? false);
     setSyncBasePaths(targetSession.syncBasePaths ?? null);
@@ -865,25 +947,79 @@ const App: React.FC = () => {
     // Reconnect to the new server and refresh data
     setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connecting' } : s));
     humanLog.log('CONNECT', `🔄 Reconnecting to ${targetSession.serverName}...`, 'running');
+
+    // Check if this is an OAuth provider
+    const protocol = targetSession.connectionParams.protocol;
+    const isOAuth = protocol && ['googledrive', 'dropbox', 'onedrive'].includes(protocol);
+
     try {
-      await invoke('connect_ftp', { params: targetSession.connectionParams });
-      await invoke('change_directory', { path: targetSession.remotePath });
+      if (isOAuth) {
+        // For OAuth, reconnect the provider first (like FTP does)
+        // Get OAuth credentials from settings
+        const oauthSettingsKey = 'aeroftp_oauth_settings';
+        const providerKey = protocol === 'googledrive' ? 'googledrive' : protocol;
+        let clientId = '';
+        let clientSecret = '';
+
+        try {
+          const oauthSettings = JSON.parse(localStorage.getItem(oauthSettingsKey) || '{}');
+          const providerSettings = oauthSettings[providerKey];
+          if (providerSettings?.clientId) clientId = providerSettings.clientId;
+          if (providerSettings?.clientSecret) clientSecret = providerSettings.clientSecret;
+        } catch {
+          // Fallback to legacy format
+          clientId = localStorage.getItem(`oauth_${providerKey}_client_id`) || '';
+          clientSecret = localStorage.getItem(`oauth_${providerKey}_client_secret`) || '';
+        }
+
+        if (clientId && clientSecret) {
+          // Reconnect OAuth provider
+          await invoke('oauth2_connect', {
+            params: {
+              provider: protocol === 'googledrive' ? 'google_drive' : protocol,
+              client_id: clientId,
+              client_secret: clientSecret,
+            }
+          });
+
+          // Navigate to saved path and list files
+          const targetPath = targetSession.remotePath || '/';
+          const response: FileListResponse = await invoke('provider_change_dir', { path: targetPath });
+          setRemoteFiles(response.files);
+          setCurrentRemotePath(response.current_path);
+        } else {
+          // No credentials - use cached data only
+          console.warn('[switchSession] OAuth credentials not found for', protocol);
+          setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'cached' } : s));
+          return;
+        }
+      } else {
+        // For FTP, first disconnect any active OAuth provider to avoid conflicts
+        try {
+          await invoke('provider_disconnect');
+        } catch {
+          // Ignore - provider might not be connected
+        }
+
+        // Then connect to FTP
+        await invoke('connect_ftp', { params: targetSession.connectionParams });
+        await invoke('change_directory', { path: targetSession.remotePath });
+        const response: FileListResponse = await invoke('list_files');
+        setRemoteFiles(response.files);
+        setCurrentRemotePath(response.current_path);
+      }
+
       setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connected' } : s));
       humanLog.log('CONNECT', `✅ Reconnected to ${targetSession.serverName}`, 'success');
-      
-      // Refresh BOTH remote and local files with real data
-      const response: FileListResponse = await invoke('list_files');
-      setRemoteFiles(response.files);
-      setCurrentRemotePath(response.current_path);
-      
+
       // Also refresh local files for this session's local path
-      const localFilesData: LocalFile[] = await invoke('get_local_files', { 
-        path: targetSession.localPath, 
-        showHidden: showHiddenFiles 
+      const localFilesData: LocalFile[] = await invoke('get_local_files', {
+        path: targetSession.localPath,
+        showHidden: showHiddenFiles
       });
       setLocalFiles(localFilesData);
       setCurrentLocalPath(targetSession.localPath);
-      
+
     } catch (e) {
       console.log('Reconnect error:', e);
       humanLog.log('ERROR', `❌ Failed to reconnect to ${targetSession.serverName}: ${e}`, 'error');
@@ -921,7 +1057,7 @@ const App: React.FC = () => {
     const capturedLocalPath = currentLocalPath;
     const capturedSyncNav = isSyncNavigation;
     const capturedSyncPaths = syncBasePaths;
-    
+
     // Mark current session as cached and go to connection screen (including sync state)
     if (activeSessionId) {
       setSessions(prev => prev.map(s =>
@@ -939,6 +1075,7 @@ const App: React.FC = () => {
   // Handle click on Cloud Tab - auto-connect to cloud server profile
   const handleCloudTabClick = async () => {
     console.log('Cloud Tab clicked');
+    humanLog.log('NAVIGATE', '☁️ AeroCloud tab clicked', 'running');
 
     try {
       // Get cloud config to know which server profile and folders
@@ -1005,7 +1142,7 @@ const App: React.FC = () => {
       // Get saved servers from localStorage
       const savedServersStr = localStorage.getItem('aeroftp-saved-servers');
       if (!savedServersStr) {
-        toast.error('No saved servers', 'Please save your server first');
+        notify.error('No saved servers', 'Please save your server first');
         setShowCloudPanel(true);
         return;
       }
@@ -1014,7 +1151,7 @@ const App: React.FC = () => {
       const cloudServer = savedServers.find((s: { name: string }) => s.name === cloudConfig.server_profile);
 
       if (!cloudServer) {
-        toast.error('Server not found', `Server profile "${cloudConfig.server_profile}" not found`);
+        notify.error('Server not found', `Server profile "${cloudConfig.server_profile}" not found`);
         setShowCloudPanel(true);
         return;
       }
@@ -1033,7 +1170,7 @@ const App: React.FC = () => {
       // Connect
       setLoading(true);
       const logId = humanLog.logStart('CONNECT', { server: `AeroCloud (${cloudConfig.server_profile})` });
-      toast.info('Connecting', `Connecting to ${cloudConfig.server_profile}...`);
+      notify.info('Connecting', `Connecting to ${cloudConfig.server_profile}...`);
 
       await invoke('connect_ftp', { params });
       setIsConnected(true);
@@ -1051,27 +1188,39 @@ const App: React.FC = () => {
       setCurrentLocalPath(cloudConfig.local_folder);
 
       humanLog.logSuccess('CONNECT', { server: `AeroCloud (${cloudConfig.server_profile})` }, logId);
-      toast.success('Connected', `Connected to AeroCloud (${cloudConfig.server_profile})`);
+      notify.success('Connected', `Connected to AeroCloud (${cloudConfig.server_profile})`);
 
       // Trigger a sync after connecting to cloud
       try {
         await invoke('trigger_cloud_sync');
-        toast.info('Sync Started', 'Syncing cloud files...');
+        notify.info('Sync Started', 'Syncing cloud files...');
       } catch (e) {
         console.log('Sync trigger error:', e);
       }
 
     } catch (error) {
-      toast.error('Connection Failed', String(error));
+      notify.error('Connection Failed', String(error));
       setShowCloudPanel(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const changeRemoteDirectory = async (path: string) => {
+  const changeRemoteDirectory = async (path: string, overrideProtocol?: string) => {
     try {
-      const response: FileListResponse = await invoke('change_directory', { path });
+      // Check if we're connected to an OAuth provider
+      // Use override protocol if provided (for cases where state isn't updated yet)
+      const protocol = overrideProtocol || connectionParams.protocol;
+      const isOAuth = protocol && ['googledrive', 'dropbox', 'onedrive'].includes(protocol);
+
+      let response: FileListResponse;
+      if (isOAuth) {
+        // Use provider API for OAuth
+        response = await invoke('provider_change_dir', { path });
+      } else {
+        // Use FTP API
+        response = await invoke('change_directory', { path });
+      }
       setRemoteFiles(response.files);
       setCurrentRemotePath(response.current_path);
       humanLog.logNavigate(response.current_path, true);
@@ -1095,7 +1244,7 @@ const App: React.FC = () => {
           setSyncNavDialog({ missingPath: newLocalPath, isRemote: false, targetPath: newLocalPath });
         }
       }
-    } catch (error) { toast.error('Error', `Failed to change directory: ${error}`); }
+    } catch (error) { notify.error('Error', `Failed to change directory: ${error}`); }
   };
 
   const changeLocalDirectory = async (path: string) => {
@@ -1132,14 +1281,14 @@ const App: React.FC = () => {
         const response: FileListResponse = await invoke('change_directory', { path: syncNavDialog.targetPath });
         setRemoteFiles(response.files);
         setCurrentRemotePath(response.current_path);
-        toast.success('Folder Created', syncNavDialog.missingPath);
+        notify.success('Folder Created', syncNavDialog.missingPath);
       } else {
         await invoke('create_local_folder', { path: syncNavDialog.targetPath });
         await loadLocalFiles(syncNavDialog.targetPath);
-        toast.success('Folder Created', syncNavDialog.missingPath);
+        notify.success('Folder Created', syncNavDialog.missingPath);
       }
     } catch (error) {
-      toast.error('Failed to create folder', String(error));
+      notify.error('Failed to create folder', String(error));
     }
     setSyncNavDialog(null);
   };
@@ -1147,7 +1296,7 @@ const App: React.FC = () => {
   const handleSyncNavDisable = () => {
     setIsSyncNavigation(false);
     setSyncBasePaths(null);
-    toast.info('Navigation Sync Disabled');
+    notify.info('Navigation Sync Disabled');
     setSyncNavDialog(null);
   };
 
@@ -1156,11 +1305,11 @@ const App: React.FC = () => {
     if (!isSyncNavigation) {
       // Enabling sync: save current paths as base
       setSyncBasePaths({ remote: currentRemotePath, local: currentLocalPath });
-      toast.success('Navigation Sync Enabled', `Syncing: ${currentRemotePath} ↔ ${currentLocalPath}`);
+      notify.success('Navigation Sync Enabled', `Syncing: ${currentRemotePath} ↔ ${currentLocalPath}`);
       humanLog.log('NAVIGATE', `🔗 Navigation sync enabled: ${currentRemotePath} ↔ ${currentLocalPath}`, 'success');
     } else {
       setSyncBasePaths(null);
-      toast.info('Navigation Sync Disabled');
+      notify.info('Navigation Sync Disabled');
       humanLog.log('NAVIGATE', '🔓 Navigation sync disabled', 'success');
     }
     setIsSyncNavigation(!isSyncNavigation);
@@ -1169,6 +1318,11 @@ const App: React.FC = () => {
   const downloadFile = async (remoteFilePath: string, fileName: string, destinationPath?: string, isDir: boolean = false, fileSize?: number) => {
     const logId = humanLog.logStart('DOWNLOAD', { filename: fileName });
     const startTime = Date.now();
+
+    // Check if connected to an OAuth provider (Google Drive, Dropbox, OneDrive)
+    const protocol = connectionParams.protocol;
+    const isOAuth = protocol && isOAuthProvider(protocol);
+
     try {
       if (isDir) {
         const downloadPath = destinationPath || await open({ directory: true, multiple: false, defaultPath: await downloadDir() });
@@ -1185,11 +1339,22 @@ const App: React.FC = () => {
       } else {
         const downloadPath = destinationPath || await open({ directory: true, multiple: false, defaultPath: await downloadDir() });
         if (downloadPath) {
-          const params: DownloadParams = { remote_path: remoteFilePath, local_path: `${downloadPath}/${fileName}` };
-          await invoke('download_file', { params });
+          const localPath = `${downloadPath}/${fileName}`;
+
+          // Route to provider command for OAuth, FTP command otherwise
+          if (isOAuth) {
+            await invoke('provider_download_file', {
+              remotePath: remoteFilePath,
+              localPath
+            });
+          } else {
+            const params: DownloadParams = { remote_path: remoteFilePath, local_path: localPath };
+            await invoke('download_file', { params });
+          }
+
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
           const sizeStr = fileSize ? formatBytes(fileSize) : '';
-          const msg = sizeStr 
+          const msg = sizeStr
             ? `📥 Got ${fileName} (${sizeStr}) in ${elapsed}s`
             : `📥 Got ${fileName} in ${elapsed}s`;
           humanLog.updateEntry(logId, { status: 'success', message: msg });
@@ -1197,15 +1362,20 @@ const App: React.FC = () => {
           humanLog.logError('DOWNLOAD', { filename: fileName }, logId);
         }
       }
-    } catch (error) { 
+    } catch (error) {
       humanLog.logError('DOWNLOAD', { filename: fileName }, logId);
-      toast.error('Download Failed', String(error)); 
+      notify.error('Download Failed', String(error));
     }
   };
 
   const uploadFile = async (localFilePath: string, fileName: string, isDir: boolean = false, fileSize?: number) => {
     const logId = humanLog.logStart('UPLOAD', { filename: fileName });
     const startTime = Date.now();
+
+    // Check if connected to an OAuth provider (Google Drive, Dropbox, OneDrive)
+    const protocol = connectionParams.protocol;
+    const isOAuth = protocol && isOAuthProvider(protocol);
+
     try {
       if (isDir) {
         const remotePath = `${currentRemotePath}${currentRemotePath.endsWith('/') ? '' : '/'}${fileName}`;
@@ -1215,7 +1385,17 @@ const App: React.FC = () => {
         humanLog.updateEntry(logId, { status: 'success', message: `🚀 Uploaded folder ${fileName} in ${elapsed}s` });
       } else {
         const remotePath = `${currentRemotePath}${currentRemotePath.endsWith('/') ? '' : '/'}${fileName}`;
-        await invoke('upload_file', { params: { local_path: localFilePath, remote_path: remotePath } as UploadParams });
+
+        // Route to provider command for OAuth, FTP command otherwise
+        if (isOAuth) {
+          await invoke('provider_upload_file', {
+            localPath: localFilePath,
+            remotePath
+          });
+        } else {
+          await invoke('upload_file', { params: { local_path: localFilePath, remote_path: remotePath } as UploadParams });
+        }
+
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
         const sizeStr = fileSize ? formatBytes(fileSize) : '';
         const msg = sizeStr
@@ -1223,15 +1403,15 @@ const App: React.FC = () => {
           : `🚀 Uploaded ${fileName} in ${elapsed}s`;
         humanLog.updateEntry(logId, { status: 'success', message: msg });
       }
-    } catch (error) { 
+    } catch (error) {
       humanLog.logError('UPLOAD', { filename: fileName }, logId);
-      toast.error('Upload Failed', String(error)); 
+      notify.error('Upload Failed', String(error));
     }
   };
 
-  const cancelTransfer = async () => { 
+  const cancelTransfer = async () => {
     setActiveTransfer(null); // Close popup immediately
-    try { await invoke('cancel_transfer'); } catch { } 
+    try { await invoke('cancel_transfer'); } catch { }
   };
 
   // Open DevTools with file preview
@@ -1259,7 +1439,7 @@ const App: React.FC = () => {
       });
       setDevToolsOpen(true);
     } catch (error) {
-      toast.error('Preview Failed', String(error));
+      notify.error('Preview Failed', String(error));
     }
   };
 
@@ -1277,7 +1457,7 @@ const App: React.FC = () => {
       const fileSize = file.size || 0;
       const sizeMB = (fileSize / (1024 * 1024)).toFixed(1);
       const loadingToastId = fileSize > 1024 * 1024
-        ? toast.info(`Loading ${file.name}`, `${sizeMB} MB - Please wait...`)
+        ? notify.info(`Loading ${file.name}`, `${sizeMB} MB - Please wait...`)
         : null;
 
       // MIME type mapping for all media types
@@ -1361,7 +1541,7 @@ const App: React.FC = () => {
       });
       setUniversalPreviewOpen(true);
     } catch (error) {
-      toast.error('Preview Failed', String(error));
+      notify.error('Preview Failed', String(error));
     }
   };
 
@@ -1431,7 +1611,7 @@ const App: React.FC = () => {
     const files = Array.isArray(selected) ? selected : [selected];
 
     if (files.length > 0) {
-      toast.info('Upload Started', `Uploading ${files.length} file(s)...`);
+      notify.info('Upload Started', `Uploading ${files.length} file(s)...`);
       for (const filePath of files) {
         // Extract filename from full path (cross-platform handle)
         const fileName = filePath.replace(/^.*[\\\/]/, '');
@@ -1477,6 +1657,10 @@ const App: React.FC = () => {
     const names = filesOverride || Array.from(selectedRemoteFiles);
     if (names.length === 0) return;
 
+    // Check if connected to an OAuth provider
+    const protocol = connectionParams.protocol;
+    const isOAuth = protocol && isOAuthProvider(protocol);
+
     setConfirmDialog({
       message: `Delete ${names.length} selected items?`,
       onConfirm: async () => {
@@ -1487,8 +1671,17 @@ const App: React.FC = () => {
         for (const name of names) {
           const file = remoteFiles.find(f => f.name === name);
           if (file) {
-            try { 
-              await invoke('delete_remote_file', { path: file.path, isDir: file.is_dir }); 
+            try {
+              // Route to provider command for OAuth, FTP command otherwise
+              if (isOAuth) {
+                if (file.is_dir) {
+                  await invoke('provider_delete_dir', { path: file.path, recursive: true });
+                } else {
+                  await invoke('provider_delete_file', { path: file.path });
+                }
+              } else {
+                await invoke('delete_remote_file', { path: file.path, isDir: file.is_dir });
+              }
               if (file.is_dir) {
                 deletedFolders.push(name);
               } else {
@@ -1506,7 +1699,7 @@ const App: React.FC = () => {
         if (deletedFolders.length > 0) parts.push(`${deletedFolders.length} folder${deletedFolders.length > 1 ? 's' : ''}`);
         if (deletedFiles.length > 0) parts.push(`${deletedFiles.length} file${deletedFiles.length > 1 ? 's' : ''}`);
         humanLog.updateEntry(logId, { status: 'success', message: `✅ Cleanup complete: ${parts.join(' and ')} removed` });
-        toast.success(parts.join(', '), `${parts.join(' and ')} deleted`);
+        notify.success(parts.join(', '), `${parts.join(' and ')} deleted`);
       }
     });
   };
@@ -1525,8 +1718,8 @@ const App: React.FC = () => {
         for (const name of names) {
           const file = localFiles.find(f => f.name === name);
           if (file) {
-            try { 
-              await invoke('delete_local_file', { path: file.path }); 
+            try {
+              await invoke('delete_local_file', { path: file.path });
               if (file.is_dir) {
                 deletedFolders.push(name);
               } else {
@@ -1544,7 +1737,7 @@ const App: React.FC = () => {
         if (deletedFolders.length > 0) parts.push(`${deletedFolders.length} folder${deletedFolders.length > 1 ? 's' : ''}`);
         if (deletedFiles.length > 0) parts.push(`${deletedFiles.length} file${deletedFiles.length > 1 ? 's' : ''}`);
         humanLog.updateEntry(logId, { status: 'success', message: `✅ Cleanup complete: ${parts.join(' and ')} removed` });
-        toast.success(parts.join(', '), `${parts.join(' and ')} deleted`);
+        notify.success(parts.join(', '), `${parts.join(' and ')} deleted`);
       }
     });
   };
@@ -1552,20 +1745,34 @@ const App: React.FC = () => {
   // File operations with proper confirm BEFORE action
   const deleteRemoteFile = (path: string, isDir: boolean) => {
     const fileName = path.split('/').pop() || path;
+
+    // Check if connected to an OAuth provider
+    const protocol = connectionParams.protocol;
+    const isOAuth = protocol && isOAuthProvider(protocol);
+
     setConfirmDialog({
       message: `Delete "${fileName}"?`,
       onConfirm: async () => {
         setConfirmDialog(null);
         const logId = humanLog.logStart('DELETE', { filename: fileName });
         try {
-          await invoke('delete_remote_file', { path, isDir });
+          // Route to provider command for OAuth, FTP command otherwise
+          if (isOAuth) {
+            if (isDir) {
+              await invoke('provider_delete_dir', { path, recursive: true });
+            } else {
+              await invoke('provider_delete_file', { path });
+            }
+          } else {
+            await invoke('delete_remote_file', { path, isDir });
+          }
           humanLog.logSuccess('DELETE', { filename: fileName }, logId);
-          toast.success('Deleted', fileName);
+          notify.success('Deleted', fileName);
           await loadRemoteFiles();
         }
-        catch (error) { 
+        catch (error) {
           humanLog.logError('DELETE', { filename: fileName }, logId);
-          toast.error('Delete Failed', String(error)); 
+          notify.error('Delete Failed', String(error));
         }
       }
     });
@@ -1581,12 +1788,12 @@ const App: React.FC = () => {
         try {
           await invoke('delete_local_file', { path });
           humanLog.logSuccess('DELETE', { filename: fileName }, logId);
-          toast.success('Deleted', fileName);
+          notify.success('Deleted', fileName);
           await loadLocalFiles(currentLocalPath);
         }
-        catch (error) { 
+        catch (error) {
           humanLog.logError('DELETE', { filename: fileName }, logId);
-          toast.error('Delete Failed', String(error)); 
+          notify.error('Delete Failed', String(error));
         }
       }
     });
@@ -1613,10 +1820,10 @@ const App: React.FC = () => {
             await loadLocalFiles(currentLocalPath);
           }
           humanLog.logSuccess('RENAME', { oldname: currentName, newname: newName }, logId);
-          toast.success('Renamed', newName);
-        } catch (error) { 
+          notify.success('Renamed', newName);
+        } catch (error) {
           humanLog.logError('RENAME', { oldname: currentName, newname: newName }, logId);
-          toast.error('Rename Failed', String(error)); 
+          notify.error('Rename Failed', String(error));
         }
       }
     });
@@ -1642,10 +1849,10 @@ const App: React.FC = () => {
             await loadLocalFiles(currentLocalPath);
           }
           humanLog.logSuccess('MKDIR', { foldername: name }, logId);
-          toast.success('Created', name);
-        } catch (error) { 
+          notify.success('Created', name);
+        } catch (error) {
           humanLog.logError('MKDIR', { foldername: name }, logId);
-          toast.error('Create Failed', String(error)); 
+          notify.error('Create Failed', String(error));
         }
       }
     });
@@ -1674,13 +1881,13 @@ const App: React.FC = () => {
       { label: 'Rename', icon: <Pencil size={14} />, action: () => renameFile(file.path, file.name, true), disabled: count > 1 },
       { label: 'Permissions', icon: <Shield size={14} />, action: () => setPermissionsDialog({ file, visible: true }), disabled: count > 1 },
       { label: 'Delete', icon: <Trash2 size={14} />, action: () => deleteMultipleRemoteFiles(filesToUse), danger: true, divider: true },
-      { label: 'Copy Path', icon: <Copy size={14} />, action: () => { navigator.clipboard.writeText(file.path); toast.success('Path copied'); } },
-      { label: 'Copy Name', icon: <Clipboard size={14} />, action: () => { navigator.clipboard.writeText(file.name); toast.success('Name copied'); } },
+      { label: 'Copy Path', icon: <Copy size={14} />, action: () => { navigator.clipboard.writeText(file.path); notify.success('Path copied'); } },
+      { label: 'Copy Name', icon: <Clipboard size={14} />, action: () => { navigator.clipboard.writeText(file.name); notify.success('Name copied'); } },
       {
         label: 'Copy FTP URL', icon: <Link2 size={14} />, action: () => {
           const url = `ftp://${connectionParams.username}@${connectionParams.server}${file.path}`;
           navigator.clipboard.writeText(url);
-          toast.success('FTP URL copied');
+          notify.success('FTP URL copied');
         }
       },
     ];
@@ -1714,8 +1921,8 @@ const App: React.FC = () => {
       { label: 'View Source', icon: <Code size={14} />, action: () => openDevToolsPreview(file, false), disabled: count > 1 || file.is_dir || !isPreviewable(file.name) },
       { label: 'Rename', icon: <Pencil size={14} />, action: () => renameFile(file.path, file.name, false), disabled: count > 1 },
       { label: 'Delete', icon: <Trash2 size={14} />, action: () => deleteMultipleLocalFiles(filesToUpload), danger: true, divider: true },
-      { label: 'Copy Path', icon: <Copy size={14} />, action: () => { navigator.clipboard.writeText(file.path); toast.success('Path copied'); } },
-      { label: 'Copy Name', icon: <Clipboard size={14} />, action: () => { navigator.clipboard.writeText(file.name); toast.success('Name copied'); }, divider: true },
+      { label: 'Copy Path', icon: <Copy size={14} />, action: () => { navigator.clipboard.writeText(file.path); notify.success('Path copied'); } },
+      { label: 'Copy Name', icon: <Clipboard size={14} />, action: () => { navigator.clipboard.writeText(file.name); notify.success('Name copied'); }, divider: true },
       { label: 'Open in File Manager', icon: <ExternalLink size={14} />, action: () => openInFileManager(file.is_dir ? file.path : currentLocalPath) },
     ];
     contextMenu.show(e, items);
@@ -1759,10 +1966,10 @@ const App: React.FC = () => {
           if (permissionsDialog?.file) {
             try {
               await invoke('chmod_remote_file', { path: permissionsDialog.file.path, mode });
-              toast.success('Permissions Updated', `${permissionsDialog.file.name} -> ${mode}`);
+              notify.success('Permissions Updated', `${permissionsDialog.file.name} -> ${mode}`);
               await loadRemoteFiles();
               setPermissionsDialog(null);
-            } catch (e) { toast.error('Failed', String(e)); }
+            } catch (e) { notify.error('Failed', String(e)); }
           }
         }}
         fileName={permissionsDialog?.file.name || ''}
@@ -1770,7 +1977,11 @@ const App: React.FC = () => {
       />
       <AboutDialog isOpen={showAboutDialog} onClose={() => setShowAboutDialog(false)} />
       <ShortcutsDialog isOpen={showShortcutsDialog} onClose={() => setShowShortcutsDialog(false)} />
-      <SettingsPanel isOpen={showSettingsPanel} onClose={() => setShowSettingsPanel(false)} />
+      <SettingsPanel
+        isOpen={showSettingsPanel}
+        onClose={() => setShowSettingsPanel(false)}
+        onOpenCloudPanel={() => setShowCloudPanel(true)}
+      />
 
       {/* Universal Preview Modal for Media Files */}
       <UniversalPreview
@@ -1839,8 +2050,39 @@ const App: React.FC = () => {
             onConnectionParamsChange={setConnectionParams}
             onQuickConnectDirsChange={setQuickConnectDirs}
             onConnect={connectToFtp}
+            onOpenCloudPanel={() => setShowCloudPanel(true)}
             onSavedServerConnect={async (params, initialPath, localInitialPath) => {
               setConnectionParams(params);
+
+              // Check if this is an OAuth provider
+              const isOAuth = params.protocol && ['googledrive', 'dropbox', 'onedrive'].includes(params.protocol);
+              console.log('[onSavedServerConnect] params:', params);
+              console.log('[onSavedServerConnect] isOAuth:', isOAuth);
+
+              if (isOAuth) {
+                // OAuth provider is already connected via SavedServers component
+                // Just switch to file manager view
+                setIsConnected(true);
+                setShowConnectionScreen(false);
+                const providerName = params.protocol === 'googledrive' ? 'Google Drive' : params.protocol === 'dropbox' ? 'Dropbox' : 'OneDrive';
+                notify.success('Connected', `Connected to ${providerName}`);
+                // Load remote files for OAuth provider - pass protocol explicitly
+                await loadRemoteFiles(params.protocol);
+                // Navigate to initial local directory if specified
+                if (localInitialPath) {
+                  await changeLocalDirectory(localInitialPath);
+                }
+                // Create session with provider name
+                createSession(
+                  providerName,
+                  params,
+                  initialPath || '/',
+                  localInitialPath || currentLocalPath
+                );
+                return;
+              }
+
+              // Standard FTP/SFTP connection
               setLoading(true);
               // Reset navigation sync for new connection
               setIsSyncNavigation(false);
@@ -1850,7 +2092,7 @@ const App: React.FC = () => {
                 await invoke('connect_ftp', { params });
                 setIsConnected(true);
                 humanLog.logSuccess('CONNECT', { server: params.server }, logId);
-                toast.success('Connected', `Connected to ${params.server}`);
+                notify.success('Connected', `Connected to ${params.server}`);
                 if (initialPath) {
                   await changeRemoteDirectory(initialPath);
                 } else {
@@ -1867,7 +2109,7 @@ const App: React.FC = () => {
                 );
               } catch (error) {
                 humanLog.logError('CONNECT', { server: params.server }, logId);
-                toast.error('Connection Failed', String(error));
+                notify.error('Connection Failed', String(error));
               } finally {
                 setLoading(false);
               }
@@ -2448,7 +2690,7 @@ const App: React.FC = () => {
                                 ? `${currentLocalPath}/${previewFile.name}`
                                 : `${currentRemotePath}/${previewFile.name}`;
                               navigator.clipboard.writeText(path);
-                              toast.success('Copied', 'Path copied to clipboard');
+                              notify.success('Copied', 'Path copied to clipboard');
                             }}
                             className="w-full px-3 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-xs rounded-lg flex items-center justify-center gap-2 transition-colors"
                           >
@@ -2494,17 +2736,17 @@ const App: React.FC = () => {
             if (file.isRemote) {
               await invoke('save_remote_file', { path: file.path, content });
               humanLog.logSuccess('UPLOAD', { filename: file.name, size: content.length }, logId);
-              toast.success('File Saved', `${file.name} saved to server`);
+              notify.success('File Saved', `${file.name} saved to server`);
               await loadRemoteFiles();
             } else {
               await invoke('save_local_file', { path: file.path, content });
               humanLog.log('INFO', `💾 Saved ${file.name} locally`, 'success');
-              toast.success('File Saved', `${file.name} saved locally`);
+              notify.success('File Saved', `${file.name} saved locally`);
               await loadLocalFiles(currentLocalPath);
             }
           } catch (error) {
             humanLog.logError('UPLOAD', { filename: file.name }, logId);
-            toast.error('Save Failed', String(error));
+            notify.error('Save Failed', String(error));
           }
         }}
       />

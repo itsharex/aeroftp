@@ -21,6 +21,14 @@ pub enum ProviderType {
     WebDav,
     /// Amazon S3 and S3-compatible storage
     S3,
+    /// AeroCloud - Personal FTP-based cloud sync
+    AeroCloud,
+    /// Google Drive (OAuth2)
+    GoogleDrive,
+    /// Dropbox (OAuth2)
+    Dropbox,
+    /// Microsoft OneDrive (OAuth2)
+    OneDrive,
 }
 
 impl fmt::Display for ProviderType {
@@ -31,6 +39,10 @@ impl fmt::Display for ProviderType {
             ProviderType::Sftp => write!(f, "SFTP"),
             ProviderType::WebDav => write!(f, "WebDAV"),
             ProviderType::S3 => write!(f, "S3"),
+            ProviderType::AeroCloud => write!(f, "AeroCloud"),
+            ProviderType::GoogleDrive => write!(f, "Google Drive"),
+            ProviderType::Dropbox => write!(f, "Dropbox"),
+            ProviderType::OneDrive => write!(f, "OneDrive"),
         }
     }
 }
@@ -44,12 +56,39 @@ impl ProviderType {
             ProviderType::Sftp => 22,
             ProviderType::WebDav => 443,
             ProviderType::S3 => 443,
+            ProviderType::AeroCloud => 21, // Uses FTP in background
+            ProviderType::GoogleDrive => 443,
+            ProviderType::Dropbox => 443,
+            ProviderType::OneDrive => 443,
         }
     }
     
     /// Check if this provider uses encryption by default
     pub fn uses_encryption(&self) -> bool {
-        matches!(self, ProviderType::Ftps | ProviderType::Sftp | ProviderType::WebDav | ProviderType::S3)
+        matches!(self, 
+            ProviderType::Ftps | 
+            ProviderType::Sftp | 
+            ProviderType::WebDav | 
+            ProviderType::S3 |
+            ProviderType::AeroCloud |  // AeroCloud recommends FTPS
+            ProviderType::GoogleDrive |
+            ProviderType::Dropbox |
+            ProviderType::OneDrive
+        )
+    }
+    
+    /// Check if this provider requires OAuth2 authentication
+    pub fn requires_oauth2(&self) -> bool {
+        matches!(self, 
+            ProviderType::GoogleDrive |
+            ProviderType::Dropbox |
+            ProviderType::OneDrive
+        )
+    }
+    
+    /// Check if this is an AeroCloud provider (uses FTP backend with sync)
+    pub fn is_aerocloud(&self) -> bool {
+        matches!(self, ProviderType::AeroCloud)
     }
 }
 
@@ -329,6 +368,9 @@ pub enum ProviderError {
     
     #[error("Unknown error: {0}")]
     Unknown(String),
+    
+    #[error("{0}")]
+    Other(String),
 }
 
 impl ProviderError {

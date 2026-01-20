@@ -510,3 +510,249 @@ pub async fn provider_exists(
     provider.exists(&path).await
         .map_err(|e| format!("Failed to check existence: {}", e))
 }
+
+// ============ OAuth2 Commands ============
+
+/// OAuth2 connection parameters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthConnectionParams {
+    /// Provider: "google_drive", "dropbox", "onedrive"
+    pub provider: String,
+    /// OAuth2 client ID (from app registration)
+    pub client_id: String,
+    /// OAuth2 client secret (from app registration)
+    pub client_secret: String,
+}
+
+/// OAuth2 flow state
+#[derive(Debug, Clone, Serialize)]
+pub struct OAuthFlowStarted {
+    /// URL to open in browser
+    pub auth_url: String,
+    /// State parameter for verification
+    pub state: String,
+}
+
+/// Start OAuth2 authentication flow
+/// Returns the authorization URL to open in browser
+#[tauri::command]
+pub async fn oauth2_start_auth(
+    params: OAuthConnectionParams,
+) -> Result<OAuthFlowStarted, String> {
+    use crate::providers::{OAuth2Manager, OAuthConfig};
+    
+    info!("Starting OAuth2 flow for {}", params.provider);
+    
+    let config = match params.provider.to_lowercase().as_str() {
+        "google_drive" | "googledrive" | "google" => {
+            OAuthConfig::google(&params.client_id, &params.client_secret)
+        }
+        "dropbox" => {
+            OAuthConfig::dropbox(&params.client_id, &params.client_secret)
+        }
+        "onedrive" | "microsoft" => {
+            OAuthConfig::onedrive(&params.client_id, &params.client_secret)
+        }
+        other => return Err(format!("Unknown OAuth2 provider: {}", other)),
+    };
+    
+    let manager = OAuth2Manager::new();
+    let (auth_url, state) = manager.start_auth_flow(&config).await
+        .map_err(|e| format!("Failed to start OAuth flow: {}", e))?;
+    
+    // Open URL in default browser
+    if let Err(e) = open::that(&auth_url) {
+        info!("Could not open browser automatically: {}", e);
+    }
+    
+    Ok(OAuthFlowStarted { auth_url, state })
+}
+
+/// Complete OAuth2 authentication with the authorization code
+#[tauri::command]
+pub async fn oauth2_complete_auth(
+    params: OAuthConnectionParams,
+    code: String,
+    state: String,
+) -> Result<String, String> {
+    use crate::providers::{OAuth2Manager, OAuthConfig};
+    
+    info!("Completing OAuth2 flow for {}", params.provider);
+    
+    let config = match params.provider.to_lowercase().as_str() {
+        "google_drive" | "googledrive" | "google" => {
+            OAuthConfig::google(&params.client_id, &params.client_secret)
+        }
+        "dropbox" => {
+            OAuthConfig::dropbox(&params.client_id, &params.client_secret)
+        }
+        "onedrive" | "microsoft" => {
+            OAuthConfig::onedrive(&params.client_id, &params.client_secret)
+        }
+        other => return Err(format!("Unknown OAuth2 provider: {}", other)),
+    };
+    
+    let manager = OAuth2Manager::new();
+    manager.complete_auth_flow(&config, &code, &state).await
+        .map_err(|e| format!("Failed to complete OAuth flow: {}", e))?;
+    
+    Ok("Authentication successful".to_string())
+}
+
+/// Connect to an OAuth2-based cloud provider (after authentication)
+#[tauri::command]
+pub async fn oauth2_connect(
+    state: State<'_, ProviderState>,
+    params: OAuthConnectionParams,
+) -> Result<String, String> {
+    use crate::providers::{GoogleDriveProvider, DropboxProvider, OneDriveProvider, 
+                          google_drive::GoogleDriveConfig, dropbox::DropboxConfig, 
+                          onedrive::OneDriveConfig};
+    
+    info!("Connecting to OAuth2 provider: {}", params.provider);
+    
+    let provider: Box<dyn StorageProvider> = match params.provider.to_lowercase().as_str() {
+        "google_drive" | "googledrive" | "google" => {
+            let config = GoogleDriveConfig::new(&params.client_id, &params.client_secret);
+            let mut p = GoogleDriveProvider::new(config);
+            p.connect().await
+                .map_err(|e| format!("Google Drive connection failed: {}", e))?;
+            Box::new(p)
+        }
+        "dropbox" => {
+            let config = DropboxConfig::new(&params.client_id, &params.client_secret);
+            let mut p = DropboxProvider::new(config);
+            p.connect().await
+                .map_err(|e| format!("Dropbox connection failed: {}", e))?;
+            Box::new(p)
+        }
+        "onedrive" | "microsoft" => {
+            let config = OneDriveConfig::new(&params.client_id, &params.client_secret);
+            let mut p = OneDriveProvider::new(config);
+            p.connect().await
+                .map_err(|e| format!("OneDrive connection failed: {}", e))?;
+            Box::new(p)
+        }
+        other => return Err(format!("Unknown OAuth2 provider: {}", other)),
+    };
+    
+    let display_name = provider.display_name();
+    
+    // Store provider
+    let mut provider_lock = state.provider.lock().await;
+    *provider_lock = Some(provider);
+    
+    info!("Connected to {}", display_name);
+    Ok(display_name)
+}
+
+/// Full OAuth2 authentication flow - starts server, opens browser, waits for callback, completes auth
+#[tauri::command]
+pub async fn oauth2_full_auth(
+    params: OAuthConnectionParams,
+) -> Result<String, String> {
+    use crate::providers::{OAuth2Manager, OAuthConfig, oauth2::start_callback_server};
+    
+    info!("Starting full OAuth2 flow for {}", params.provider);
+    
+    let config = match params.provider.to_lowercase().as_str() {
+        "google_drive" | "googledrive" | "google" => {
+            OAuthConfig::google(&params.client_id, &params.client_secret)
+        }
+        "dropbox" => {
+            OAuthConfig::dropbox(&params.client_id, &params.client_secret)
+        }
+        "onedrive" | "microsoft" => {
+            OAuthConfig::onedrive(&params.client_id, &params.client_secret)
+        }
+        other => return Err(format!("Unknown OAuth2 provider: {}", other)),
+    };
+    
+    // Create manager ONCE and keep it for the entire flow
+    let manager = OAuth2Manager::new();
+    
+    // Generate auth URL first
+    let (auth_url, expected_state) = manager.start_auth_flow(&config).await
+        .map_err(|e| format!("Failed to start OAuth flow: {}", e))?;
+    
+    // Start callback server in background BEFORE opening browser
+    let callback_handle = tokio::spawn(async move {
+        start_callback_server(17548).await
+    });
+    
+    // Give the server a moment to start
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    
+    // Open URL in default browser
+    if let Err(e) = open::that(&auth_url) {
+        info!("Could not open browser automatically: {}", e);
+        return Err(format!("Could not open browser: {}. Please open this URL manually: {}", e, auth_url));
+    }
+    
+    info!("Browser opened, waiting for callback...");
+    
+    // Wait for callback (with timeout)
+    let callback_result = tokio::time::timeout(
+        tokio::time::Duration::from_secs(300), // 5 minute timeout
+        callback_handle
+    ).await
+        .map_err(|_| "OAuth timeout: no response within 5 minutes")?
+        .map_err(|e| format!("Callback server error: {}", e))?
+        .map_err(|e| format!("Callback error: {}", e))?;
+    
+    let (code, state) = callback_result;
+    
+    // Verify state matches
+    if state != expected_state {
+        return Err("OAuth state mismatch - possible CSRF attack".to_string());
+    }
+    
+    info!("Callback received, completing authentication...");
+    
+    // Complete the flow using the SAME manager instance (which has the PKCE verifier stored)
+    manager.complete_auth_flow(&config, &code, &expected_state).await
+        .map_err(|e| format!("Failed to exchange code for tokens: {}", e))?;
+    
+    info!("OAuth2 authentication completed successfully for {}", params.provider);
+    Ok("Authentication successful! You can now connect.".to_string())
+}
+
+/// Check if OAuth2 tokens exist for a provider
+#[tauri::command]
+pub async fn oauth2_has_tokens(
+    provider: String,
+) -> Result<bool, String> {
+    use crate::providers::{OAuth2Manager, OAuthProvider};
+    
+    let oauth_provider = match provider.to_lowercase().as_str() {
+        "google_drive" | "googledrive" | "google" => OAuthProvider::Google,
+        "dropbox" => OAuthProvider::Dropbox,
+        "onedrive" | "microsoft" => OAuthProvider::OneDrive,
+        other => return Err(format!("Unknown OAuth2 provider: {}", other)),
+    };
+    
+    let manager = OAuth2Manager::new();
+    Ok(manager.has_tokens(oauth_provider))
+}
+
+/// Clear OAuth2 tokens for a provider (logout)
+#[tauri::command]
+pub async fn oauth2_logout(
+    provider: String,
+) -> Result<(), String> {
+    use crate::providers::{OAuth2Manager, OAuthProvider};
+    
+    let oauth_provider = match provider.to_lowercase().as_str() {
+        "google_drive" | "googledrive" | "google" => OAuthProvider::Google,
+        "dropbox" => OAuthProvider::Dropbox,
+        "onedrive" | "microsoft" => OAuthProvider::OneDrive,
+        other => return Err(format!("Unknown OAuth2 provider: {}", other)),
+    };
+    
+    let manager = OAuth2Manager::new();
+    manager.clear_tokens(oauth_provider)
+        .map_err(|e| format!("Failed to clear tokens: {}", e))?;
+    
+    info!("Logged out from {}", provider);
+    Ok(())
+}

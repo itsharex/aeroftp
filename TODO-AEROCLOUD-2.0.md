@@ -98,35 +98,70 @@ aws-config = "1"
 
 ---
 
-## 📋 Sprint 2: Encryption & Multi-Cloud (v1.2.0)
+## 📋 Sprint 2: OAuth2 Cloud Providers (v1.2.0)
 
 ### Goals
+- [x] Google Drive integration (PARTIAL)
+- [ ] Dropbox integration  
+- [ ] OneDrive integration
+
+### Completed (v1.2.0)
+- [x] OAuth2 flow with local callback server
+- [x] Google Drive API v3 provider (browse, download, upload, delete)
+- [x] Add OAuth providers to ProtocolSelector
+- [x] Provider-specific tab icons (Google Drive, Dropbox, OneDrive)
+- [x] OAuth credentials loading from Settings panel
+
+### Known Limitations
+> ⚠️ **Session Switching Workaround Applied**: v1.2.0 reconnects OAuth on each switch.
+> For optimal experience, test full multi-session backend in Sprint 3.
+
+### Remaining Tasks (v1.2.1)
+- [ ] Dropbox API v2 provider implementation
+- [ ] Microsoft Graph API provider (OneDrive)
+- [ ] MEGA.nz provider (MEGAcmd REST API)
+- [ ] WebDAV testing (Nextcloud, Synology)
+- [ ] S3 testing (AWS, MinIO, R2)
+- [ ] Secure token storage (keyring)
+- [ ] Token refresh handling
+- [ ] Test OAuth flow on macOS/Windows
+
+---
+
+## 📋 Sprint 3: Multi-Session Architecture & Encryption (v1.3.0)
+
+### Goals
+- [ ] **Multi-session backend support** (HIGH PRIORITY)
 - [ ] Cryptomator-compatible client-side encryption
 - [ ] Multi-cloud unified view
 - [ ] Cross-cloud file operations
 
+### Multi-Session Architecture (Required)
+Current architecture uses single `ProviderState`:
+```rust
+pub struct ProviderState {
+    pub provider: Arc<Mutex<Option<Box<dyn StorageProvider>>>>
+}
+```
+
+**Target architecture** with session-based provider management:
+```rust
+pub struct MultiSessionState {
+    // Map session_id -> provider instance
+    pub providers: Arc<Mutex<HashMap<String, Box<dyn StorageProvider>>>>
+}
+```
+
 ### Tasks
+- [ ] Refactor ProviderState to support multiple active sessions
+- [ ] Add session_id parameter to all provider commands
+- [ ] Update frontend to pass session_id with each operation
+- [ ] Implement proper session lifecycle (create, switch, close)
 - [ ] Implement Cryptomator vault format
 - [ ] AES-256-GCM encryption layer
 - [ ] Filename encryption/obfuscation
-- [ ] Multi-tab cloud browser
+- [ ] Multi-tab cloud browser with independent sessions
 - [ ] Drag & drop between clouds
-
----
-
-## 📋 Sprint 3: OAuth2 Cloud Providers (v1.3.0)
-
-### Goals
-- [ ] Google Drive integration
-- [ ] Dropbox integration
-- [ ] OneDrive integration
-
-### Tasks
-- [ ] OAuth2 flow with system browser
-- [ ] Secure token storage (keyring)
-- [ ] Google Drive API v3
-- [ ] Dropbox API v2
-- [ ] Microsoft Graph API
 
 ---
 
@@ -201,7 +236,7 @@ src-tauri/src/
 | SFTP         | ✅      | ✅      | ✅        | ✅    | ❌     |
 | WebDAV       | 🔄      | 🔄      | 🔄        | 🔄    | 🔄     |
 | S3           | 🔄      | 🔄      | 🔄        | 🔄    | 🔄     |
-| Google Drive | 📋      | 📋      | 📋        | 📋    | 📋     |
+| Google Drive | ✅      | ✅      | ✅        | 📋    | 📋     |
 | Dropbox      | 📋      | 📋      | 📋        | 📋    | 📋     |
 | OneDrive     | 📋      | 📋      | 📋        | 📋    | 📋     |
 

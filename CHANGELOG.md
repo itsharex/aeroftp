@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-01-20
+
+### ☁️ Google Drive Integration (OAuth2)
+
+AeroFTP now connects to Google Drive! More cloud providers coming in v1.2.1.
+
+#### Added
+- **Google Drive Support**: Full file management (browse, upload, download, delete)
+- **OAuth2 Authentication**: Secure login via browser with local callback server
+- **Provider Icons in Tabs**: Google Drive, Dropbox, OneDrive icons in session tabs
+- **OAuth Settings Panel**: Configure API credentials in Settings → Cloud Storage
+- **Quick Connect OAuth**: One-click connection for configured providers
+- **OAuthConnect Component**: Modern OAuth sign-in UI
+
+#### Fixed
+- **Session Switching**: Fixed multi-session switching between FTP and OAuth providers
+- **OAuth Credentials Loading**: Now reads from both legacy and new localStorage formats
+- **Download/Upload/Delete Routing**: Proper command routing for OAuth providers
+
+#### Coming Soon (v1.2.1)
+- Dropbox integration (visible but disabled)
+- OneDrive integration (visible but disabled)
+- WebDAV and S3 testing (visible but disabled)
+- MEGA integration (planned)
+
+#### Technical
+- `oauth2.rs`: PKCE flow with local callback server (port 17548)
+- `google_drive.rs`: Google Drive API v3 implementation
+- `switchSession`: Reconnects OAuth provider on session switch
+- `provider_disconnect`: Called before switching from OAuth to FTP
+
+---
+
 ## [1.1.0] - 2026-01-20
 
 ### 🌐 Multi-Protocol Cloud Storage (Sprint 1)

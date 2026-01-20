@@ -33,6 +33,10 @@ pub struct CloudConfig {
     pub last_sync: Option<DateTime<Utc>>,
     /// Conflict resolution strategy
     pub conflict_strategy: ConflictStrategy,
+    /// Public URL base for sharing links (e.g., https://cloud.example.com/)
+    /// If set, enables "Share Link" functionality
+    #[serde(default)]
+    pub public_url_base: Option<String>,
 }
 
 /// How to handle file conflicts
@@ -88,6 +92,7 @@ impl Default for CloudConfig {
             ],
             last_sync: None,
             conflict_strategy: ConflictStrategy::default(),
+            public_url_base: None,
         }
     }
 }

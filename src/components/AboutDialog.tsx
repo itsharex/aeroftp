@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { X, Github, Heart, Cpu, Globe, Mail, Copy, Check, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { useTranslation } from '../i18n';
+import { openUrl } from '../utils/openUrl';
 
 interface AboutDialogProps {
     isOpen: boolean;
@@ -204,22 +205,20 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose }) => 
 
                     {/* Links */}
                     <div className="flex justify-center gap-3">
-                        <a
-                            href="https://github.com/axpnet/aeroftp"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button
+                            onClick={() => openUrl('https://github.com/axpnet/aeroftp')}
                             className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors text-sm text-gray-300"
                         >
                             <Github size={16} />
                             GitHub
-                        </a>
-                        <a
-                            href="mailto:aeroftp@axpdev.it"
+                        </button>
+                        <button
+                            onClick={() => openUrl('mailto:aeroftp@axpdev.it')}
                             className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors text-sm text-gray-300"
                         >
                             <Mail size={16} />
                             Contact
-                        </a>
+                        </button>
                     </div>
 
                     {/* Crypto Donations Section */}

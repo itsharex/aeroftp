@@ -12,22 +12,30 @@
 //! │  connect, list, upload, download, etc.      │
 //! └─────────────────────────────────────────────┘
 //!                      │
-//!        ┌─────────────┼─────────────┐
-//!        ▼             ▼             ▼
-//!   ┌─────────┐   ┌─────────┐   ┌─────────┐
-//!   │   FTP   │   │ WebDAV  │   │   S3    │
-//!   └─────────┘   └─────────┘   └─────────┘
+//!    ┌───────┬─────────┼─────────┬────────┐
+//!    ▼       ▼         ▼         ▼        ▼
+//! ┌─────┐ ┌──────┐ ┌─────┐ ┌────────┐ ┌────────┐
+//! │ FTP │ │WebDAV│ │ S3  │ │ GDrive │ │Dropbox │
+//! └─────┘ └──────┘ └─────┘ └────────┘ └────────┘
 //! ```
 
 pub mod types;
 pub mod ftp;
 pub mod webdav;
 pub mod s3;
+pub mod oauth2;
+pub mod google_drive;
+pub mod dropbox;
+pub mod onedrive;
 
 pub use types::*;
 pub use ftp::FtpProvider;
 pub use webdav::WebDavProvider;
 pub use s3::S3Provider;
+pub use google_drive::GoogleDriveProvider;
+pub use dropbox::DropboxProvider;
+pub use onedrive::OneDriveProvider;
+pub use oauth2::{OAuth2Manager, OAuthConfig, OAuthProvider};
 
 use async_trait::async_trait;
 
@@ -179,6 +187,19 @@ impl ProviderFactory {
                 // SFTP will be added later
                 Err(ProviderError::NotSupported("SFTP provider not yet implemented".to_string()))
             }
+            ProviderType::AeroCloud => {
+                // AeroCloud uses FTP internally but is configured via CloudPanel
+                Err(ProviderError::NotSupported(
+                    "AeroCloud must be configured via the AeroCloud panel (click AeroCloud in status bar)".to_string()
+                ))
+            }
+            ProviderType::GoogleDrive | ProviderType::Dropbox | ProviderType::OneDrive => {
+                // OAuth2 providers require a different initialization flow
+                // Use oauth2_connect command instead
+                Err(ProviderError::NotSupported(
+                    "OAuth2 providers must be connected using oauth2_start_auth and oauth2_connect commands".to_string()
+                ))
+            }
         }
     }
     
@@ -189,6 +210,10 @@ impl ProviderFactory {
             ProviderType::Ftps,
             ProviderType::WebDav,
             ProviderType::S3,
+            ProviderType::AeroCloud,
+            ProviderType::GoogleDrive,
+            ProviderType::Dropbox,
+            ProviderType::OneDrive,
         ]
     }
 }

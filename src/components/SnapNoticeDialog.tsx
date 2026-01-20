@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, X, ExternalLink, FolderOpen } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { openUrl } from '../utils/openUrl';
 
 const SNAP_NOTICE_KEY = 'aeroftp-snap-notice-shown';
 
@@ -73,15 +74,13 @@ const SnapNoticeDialog: React.FC<SnapNoticeDialogProps> = ({ onClose }) => {
 
                 {/* Footer */}
                 <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 flex items-center justify-between">
-                    <a
-                        href="https://github.com/axpnet/aeroftp/releases"
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    <button
+                        onClick={() => openUrl('https://github.com/axpnet/aeroftp/releases')}
                         className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
                     >
                         <ExternalLink size={14} />
                         Download other formats
-                    </a>
+                    </button>
                     <button
                         onClick={handleDismiss}
                         className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"

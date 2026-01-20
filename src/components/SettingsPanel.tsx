@@ -2,18 +2,33 @@ import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { X, Settings, Server, Upload, Palette, Trash2, Edit, Plus, FolderOpen, Wifi, FileCheck, Globe } from 'lucide-react';
+import { X, Settings, Server, Upload, Palette, Trash2, Edit, Plus, FolderOpen, Wifi, FileCheck, Globe, Cloud, ExternalLink, Key } from 'lucide-react';
 import { ServerProfile } from '../types';
 import { useI18n, Language, AVAILABLE_LANGUAGES } from '../i18n';
+import { openUrl } from '../utils/openUrl';
 
 interface SettingsPanelProps {
     isOpen: boolean;
     onClose: () => void;
+    onOpenCloudPanel?: () => void;
 }
 
 // Settings storage key
 const SETTINGS_KEY = 'aeroftp_settings';
 const SERVERS_KEY = 'aeroftp-saved-servers';
+const OAUTH_SETTINGS_KEY = 'aeroftp_oauth_settings';
+
+interface OAuthSettings {
+    googledrive: { clientId: string; clientSecret: string };
+    dropbox: { clientId: string; clientSecret: string };
+    onedrive: { clientId: string; clientSecret: string };
+}
+
+const defaultOAuthSettings: OAuthSettings = {
+    googledrive: { clientId: '', clientSecret: '' },
+    dropbox: { clientId: '', clientSecret: '' },
+    onedrive: { clientId: '', clientSecret: '' },
+};
 
 interface AppSettings {
     // General
@@ -37,6 +52,8 @@ interface AppSettings {
     showStatusBar: boolean;
     compactMode: boolean;
     showSystemMenu: boolean;
+    // Notifications
+    showToastNotifications: boolean;
 }
 
 const defaultSettings: AppSettings = {
@@ -56,13 +73,15 @@ const defaultSettings: AppSettings = {
     showStatusBar: true,
     compactMode: false,
     showSystemMenu: false,
+    showToastNotifications: false,  // Default off - use Activity Log instead
 };
 
-type TabId = 'general' | 'connection' | 'servers' | 'transfers' | 'filehandling' | 'ui';
+type TabId = 'general' | 'connection' | 'servers' | 'transfers' | 'filehandling' | 'cloudproviders' | 'ui';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, onOpenCloudPanel }) => {
     const [activeTab, setActiveTab] = useState<TabId>('general');
     const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+    const [oauthSettings, setOauthSettings] = useState<OAuthSettings>(defaultOAuthSettings);
     const [servers, setServers] = useState<ServerProfile[]>([]);
     const [editingServer, setEditingServer] = useState<ServerProfile | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
@@ -78,6 +97,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                 if (saved) setSettings({ ...defaultSettings, ...JSON.parse(saved) });
                 const savedServers = localStorage.getItem(SERVERS_KEY);
                 if (savedServers) setServers(JSON.parse(savedServers));
+                const savedOAuth = localStorage.getItem(OAUTH_SETTINGS_KEY);
+                if (savedOAuth) setOauthSettings({ ...defaultOAuthSettings, ...JSON.parse(savedOAuth) });
             } catch { }
         }
     }, [isOpen]);
@@ -85,6 +106,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
     const handleSave = () => {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
         localStorage.setItem(SERVERS_KEY, JSON.stringify(servers));
+        localStorage.setItem(OAUTH_SETTINGS_KEY, JSON.stringify(oauthSettings));
         // Apply system menu setting immediately
         invoke('toggle_menu_bar', { visible: settings.showSystemMenu });
         // Notify App.tsx of settings change (for compactMode etc)
@@ -109,10 +131,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
         { id: 'general', label: 'General', icon: <Settings size={16} /> },
         { id: 'connection', label: 'Connection', icon: <Wifi size={16} /> },
         { id: 'servers', label: 'Servers', icon: <Server size={16} /> },
+        { id: 'cloudproviders', label: 'Cloud Providers', icon: <Cloud size={16} /> },
         { id: 'transfers', label: 'Transfers', icon: <Upload size={16} /> },
         { id: 'filehandling', label: 'File Handling', icon: <FileCheck size={16} /> },
         { id: 'ui', label: 'Appearance', icon: <Palette size={16} /> },
     ];
+
+    const updateOAuthSetting = (provider: keyof OAuthSettings, field: 'clientId' | 'clientSecret', value: string) => {
+        setOauthSettings(prev => ({
+            ...prev,
+            [provider]: { ...prev[provider], [field]: value }
+        }));
+        setHasChanges(true);
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -559,6 +590,179 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                             </div>
                         )}
 
+                        {activeTab === 'cloudproviders' && (
+                            <div className="space-y-6">
+                                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Cloud Provider Settings</h3>
+                                <p className="text-sm text-gray-500">Configure cloud storage providers. AeroCloud uses your FTP server, OAuth2 providers need API credentials.</p>
+
+                                {/* AeroCloud - First! */}
+                                <div className="p-4 bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-900/30 dark:to-blue-900/30 border border-sky-200 dark:border-sky-700 rounded-lg space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-gradient-to-br from-sky-400 to-blue-500 rounded-lg flex items-center justify-center shadow">
+                                                <Cloud size={16} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-medium">AeroCloud</h4>
+                                                <p className="text-xs text-gray-500">Personal FTP-based cloud sync</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-xs bg-sky-100 dark:bg-sky-800 text-sky-700 dark:text-sky-300 px-2 py-0.5 rounded-full">
+                                            No API keys needed
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Turn any FTP/FTPS server into your personal cloud. Configure sync folders, intervals, and conflict resolution.
+                                    </p>
+                                    <button
+                                        onClick={() => {
+                                            onClose();
+                                            onOpenCloudPanel?.();
+                                        }}
+                                        className="w-full py-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg text-sm font-medium hover:from-sky-600 hover:to-blue-700 transition-all"
+                                    >
+                                        Configure in AeroCloud Panel →
+                                    </button>
+                                </div>
+
+                                {/* Google Drive */}
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                                                <Cloud size={16} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-medium">Google Drive</h4>
+                                                <p className="text-xs text-gray-500">Connect with Google Account</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => openUrl('https://console.cloud.google.com/apis/credentials')}
+                                            className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1"
+                                        >
+                                            Get credentials <ExternalLink size={12} />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1">Client ID</label>
+                                            <input
+                                                type="text"
+                                                value={oauthSettings.googledrive.clientId}
+                                                onChange={e => updateOAuthSetting('googledrive', 'clientId', e.target.value)}
+                                                placeholder="xxxxxxxx.apps.googleusercontent.com"
+                                                className="w-full px-3 py-2 text-sm rounded-lg border dark:bg-gray-800 dark:border-gray-600"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1">Client Secret</label>
+                                            <input
+                                                type="password"
+                                                value={oauthSettings.googledrive.clientSecret}
+                                                onChange={e => updateOAuthSetting('googledrive', 'clientSecret', e.target.value)}
+                                                placeholder="GOCSPX-..."
+                                                className="w-full px-3 py-2 text-sm rounded-lg border dark:bg-gray-800 dark:border-gray-600"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Dropbox */}
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                                                <Cloud size={16} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-medium">Dropbox</h4>
+                                                <p className="text-xs text-gray-500">Connect with Dropbox Account</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => openUrl('https://www.dropbox.com/developers/apps')}
+                                            className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1"
+                                        >
+                                            Get credentials <ExternalLink size={12} />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1">App Key</label>
+                                            <input
+                                                type="text"
+                                                value={oauthSettings.dropbox.clientId}
+                                                onChange={e => updateOAuthSetting('dropbox', 'clientId', e.target.value)}
+                                                placeholder="xxxxxxxxxxxxxxx"
+                                                className="w-full px-3 py-2 text-sm rounded-lg border dark:bg-gray-800 dark:border-gray-600"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1">App Secret</label>
+                                            <input
+                                                type="password"
+                                                value={oauthSettings.dropbox.clientSecret}
+                                                onChange={e => updateOAuthSetting('dropbox', 'clientSecret', e.target.value)}
+                                                placeholder="xxxxxxxxxxxxxxx"
+                                                className="w-full px-3 py-2 text-sm rounded-lg border dark:bg-gray-800 dark:border-gray-600"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* OneDrive */}
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center">
+                                                <Cloud size={16} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-medium">OneDrive</h4>
+                                                <p className="text-xs text-gray-500">Connect with Microsoft Account</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => openUrl('https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps')}
+                                            className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1"
+                                        >
+                                            Get credentials <ExternalLink size={12} />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1">Application (client) ID</label>
+                                            <input
+                                                type="text"
+                                                value={oauthSettings.onedrive.clientId}
+                                                onChange={e => updateOAuthSetting('onedrive', 'clientId', e.target.value)}
+                                                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                                                className="w-full px-3 py-2 text-sm rounded-lg border dark:bg-gray-800 dark:border-gray-600"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1">Client Secret</label>
+                                            <input
+                                                type="password"
+                                                value={oauthSettings.onedrive.clientSecret}
+                                                onChange={e => updateOAuthSetting('onedrive', 'clientSecret', e.target.value)}
+                                                placeholder="xxxxxxxx~..."
+                                                className="w-full px-3 py-2 text-sm rounded-lg border dark:bg-gray-800 dark:border-gray-600"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+                                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                                        <strong>Note:</strong> OAuth2 credentials are stored locally and never sent to AeroFTP servers. 
+                                        Tokens are securely stored in your system keyring.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {activeTab === 'ui' && (
                             <div className="space-y-6">
                                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{t('settings.appearance')}</h3>
@@ -621,6 +825,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                                         <div>
                                             <p className="font-medium">Compact Mode</p>
                                             <p className="text-sm text-gray-500">Decrease spacing for higher density</p>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-center gap-3 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.showToastNotifications}
+                                            onChange={e => updateSetting('showToastNotifications', e.target.checked)}
+                                            className="w-4 h-4 rounded"
+                                        />
+                                        <div>
+                                            <p className="font-medium">Show Toast Notifications</p>
+                                            <p className="text-sm text-gray-500">Display popup notifications for actions (errors always shown). Activity Log is always available.</p>
                                         </div>
                                     </label>
                                 </div>

@@ -31,6 +31,7 @@
     "fs:write-all",
     "log:default",
     "core:path:default",
+    "shell:allow-open",
     {
       "identifier": "fs:scope",
       "allow": [

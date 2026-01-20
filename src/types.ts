@@ -14,7 +14,17 @@ export interface FileListResponse {
 }
 
 // Supported storage provider types
-export type ProviderType = 'ftp' | 'ftps' | 'sftp' | 'webdav' | 's3';
+export type ProviderType = 'ftp' | 'ftps' | 'sftp' | 'webdav' | 's3' | 'aerocloud' | 'googledrive' | 'dropbox' | 'onedrive';
+
+// Check if a provider type requires OAuth2 authentication
+export const isOAuthProvider = (type: ProviderType): boolean => {
+  return type === 'googledrive' || type === 'dropbox' || type === 'onedrive';
+};
+
+// Check if a provider type is AeroCloud
+export const isAeroCloudProvider = (type: ProviderType): boolean => {
+  return type === 'aerocloud';
+};
 
 // Provider-specific configuration options
 export interface ProviderOptions {

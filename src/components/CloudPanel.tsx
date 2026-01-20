@@ -28,6 +28,7 @@ interface CloudConfig {
     exclude_patterns: string[];
     last_sync: string | null;
     conflict_strategy: 'ask_user' | 'keep_both' | 'prefer_local' | 'prefer_remote' | 'prefer_newer';
+    public_url_base?: string | null;  // For share links
 }
 
 interface CloudSyncStatus {
@@ -729,6 +730,27 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
                                 <span className="text-sm text-gray-500 dark:text-gray-400">{t('settings.minutes')}</span>
                             </div>
                             <p className="text-xs text-gray-400 mt-1">{t('cloud.syncIntervalDesc')}</p>
+                        </div>
+
+                        {/* Public URL for sharing */}
+                        <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+                                🔗 Public URL Base
+                                <span className="text-xs text-gray-400 font-normal">(for sharing)</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={config?.public_url_base || ''}
+                                onChange={e => setConfig(prev => prev ? { 
+                                    ...prev, 
+                                    public_url_base: e.target.value || null 
+                                } : null)}
+                                className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                                placeholder="https://cloud.yourdomain.com/"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">
+                                Set this to enable "Share Link" for files. Your web server must serve files from the same path as your FTP remote folder.
+                            </p>
                         </div>
 
                         <div className="flex gap-3 pt-4">

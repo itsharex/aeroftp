@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "AeroFTP",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "identifier": "com.aeroftp.AeroFTP",
   "build": {
     "frontendDist": "../dist",
@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "AeroFTP",
-        "width": 1280,
-        "height": 830,
-        "minWidth": 900,
-        "minHeight": 600,
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 700,
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
@@ -25,7 +25,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://*.googleapis.com; img-src 'self' asset: https://asset.localhost data: blob:; media-src 'self' asset: https://asset.localhost blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; font-src 'self' data: https://cdn.jsdelivr.net; worker-src 'self' blob:",
+      "csp": "default-src 'self'; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://*.googleapis.com https://*.dropboxapi.com https://graph.microsoft.com https://login.microsoftonline.com; img-src 'self' asset: https://asset.localhost data: blob:; media-src 'self' asset: https://asset.localhost blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; font-src 'self' data: https://cdn.jsdelivr.net; worker-src 'self' blob:",
       "assetProtocol": {
         "enable": true,
         "scope": [

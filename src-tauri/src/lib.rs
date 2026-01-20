@@ -2148,6 +2148,75 @@ fn enable_aerocloud(enabled: bool) -> Result<CloudConfig, String> {
     Ok(config)
 }
 
+/// Generate a shareable link for a file in AeroCloud
+/// Returns the public URL if public_url_base is configured
+#[tauri::command]
+fn generate_share_link(local_path: String) -> Result<String, String> {
+    let config = cloud_config::load_cloud_config();
+    
+    if !config.enabled {
+        return Err("AeroCloud is not enabled".to_string());
+    }
+    
+    let public_base = config.public_url_base.as_ref()
+        .ok_or_else(|| "Public URL not configured. Go to AeroCloud Settings to set your public URL base.".to_string())?;
+    
+    let local_folder = config.local_folder.to_string_lossy();
+    let local_path_str = local_path.clone();
+    
+    // Check if file is within AeroCloud folder
+    if !local_path_str.starts_with(local_folder.as_ref()) {
+        return Err("File is not in AeroCloud folder".to_string());
+    }
+    
+    // Get relative path from AeroCloud folder
+    let relative_path = local_path_str
+        .strip_prefix(local_folder.as_ref())
+        .unwrap_or(&local_path_str)
+        .trim_start_matches('/');
+    
+    // Construct public URL
+    let base = public_base.trim_end_matches('/');
+    let url = format!("{}/{}", base, relative_path);
+    
+    info!("Generated share link: {}", url);
+    
+    Ok(url)
+}
+
+/// Generate share link from remote path (when browsing remote files)
+#[tauri::command]
+fn generate_share_link_remote(remote_path: String) -> Result<String, String> {
+    let config = cloud_config::load_cloud_config();
+    
+    if !config.enabled {
+        return Err("AeroCloud is not enabled".to_string());
+    }
+    
+    let public_base = config.public_url_base.as_ref()
+        .ok_or_else(|| "Public URL not configured. Go to AeroCloud Settings to set your public URL base.".to_string())?;
+    
+    // Check if path is within AeroCloud remote folder
+    let remote_folder = config.remote_folder.trim_end_matches('/');
+    if !remote_path.starts_with(remote_folder) {
+        return Err("File is not in AeroCloud remote folder".to_string());
+    }
+    
+    // Get relative path from remote folder
+    let relative_path = remote_path
+        .strip_prefix(remote_folder)
+        .unwrap_or(&remote_path)
+        .trim_start_matches('/');
+    
+    // Construct public URL
+    let base = public_base.trim_end_matches('/');
+    let url = format!("{}/{}", base, relative_path);
+    
+    info!("Generated share link (remote): {}", url);
+    
+    Ok(url)
+}
+
 #[tauri::command]
 fn get_default_cloud_folder() -> String {
     let default_config = CloudConfig::default();
@@ -2523,6 +2592,7 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_log::Builder::default()
             .level(log::LevelFilter::Info)
             .build())
@@ -2748,6 +2818,8 @@ pub fn run() {
             setup_aerocloud,
             get_cloud_status,
             enable_aerocloud,
+            generate_share_link,
+            generate_share_link_remote,
             get_default_cloud_folder,
             update_conflict_strategy,
             trigger_cloud_sync,
@@ -2780,6 +2852,13 @@ pub fn run() {
             provider_commands::provider_server_info,
             provider_commands::provider_file_size,
             provider_commands::provider_exists,
+            // OAuth2 cloud provider commands
+            provider_commands::oauth2_start_auth,
+            provider_commands::oauth2_complete_auth,
+            provider_commands::oauth2_connect,
+            provider_commands::oauth2_full_auth,
+            provider_commands::oauth2_has_tokens,
+            provider_commands::oauth2_logout,
             #[cfg(unix)]
             spawn_shell,
             #[cfg(unix)]

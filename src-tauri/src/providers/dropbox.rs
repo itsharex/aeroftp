@@ -1,0 +1,519 @@
+//! Dropbox Storage Provider
+//!
+//! Implements StorageProvider for Dropbox using the Dropbox API v2.
+//! Uses OAuth2 for authentication.
+
+use async_trait::async_trait;
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use tracing::{info, warn, debug};
+
+use super::{
+    StorageProvider, ProviderType, ProviderError, RemoteEntry, ProviderConfig,
+    oauth2::{OAuth2Manager, OAuthConfig, OAuthProvider},
+};
+
+/// Dropbox API endpoints
+const API_BASE: &str = "https://api.dropboxapi.com/2";
+const CONTENT_BASE: &str = "https://content.dropboxapi.com/2";
+
+/// Dropbox file metadata
+#[derive(Debug, Deserialize)]
+struct DropboxMetadata {
+    #[serde(rename = ".tag")]
+    tag: String,
+    name: String,
+    path_lower: Option<String>,
+    path_display: Option<String>,
+    id: Option<String>,
+    #[serde(default)]
+    size: u64,
+    client_modified: Option<String>,
+    server_modified: Option<String>,
+}
+
+/// List folder response
+#[derive(Debug, Deserialize)]
+struct ListFolderResult {
+    entries: Vec<DropboxMetadata>,
+    cursor: String,
+    has_more: bool,
+}
+
+/// Dropbox provider configuration
+#[derive(Debug, Clone)]
+pub struct DropboxConfig {
+    pub app_key: String,
+    pub app_secret: String,
+}
+
+impl DropboxConfig {
+    pub fn new(app_key: &str, app_secret: &str) -> Self {
+        Self {
+            app_key: app_key.to_string(),
+            app_secret: app_secret.to_string(),
+        }
+    }
+
+    pub fn from_provider_config(config: &ProviderConfig) -> Result<Self, ProviderError> {
+        let app_key = config.extra.get("app_key")
+            .or_else(|| config.extra.get("client_id"))
+            .ok_or_else(|| ProviderError::Other("Missing app_key".to_string()))?;
+        let app_secret = config.extra.get("app_secret")
+            .or_else(|| config.extra.get("client_secret"))
+            .ok_or_else(|| ProviderError::Other("Missing app_secret".to_string()))?;
+        
+        Ok(Self::new(app_key, app_secret))
+    }
+}
+
+/// Dropbox Storage Provider
+pub struct DropboxProvider {
+    config: DropboxConfig,
+    oauth_manager: OAuth2Manager,
+    client: reqwest::Client,
+    connected: bool,
+    current_path: String,
+}
+
+impl DropboxProvider {
+    pub fn new(config: DropboxConfig) -> Self {
+        Self {
+            config,
+            oauth_manager: OAuth2Manager::new(),
+            client: reqwest::Client::new(),
+            connected: false,
+            current_path: "".to_string(), // Dropbox root is ""
+        }
+    }
+
+    /// Get OAuth config
+    fn oauth_config(&self) -> OAuthConfig {
+        OAuthConfig::dropbox(&self.config.app_key, &self.config.app_secret)
+    }
+
+    /// Get authorization header
+    async fn auth_header(&self) -> Result<HeaderValue, ProviderError> {
+        let token = self.oauth_manager.get_valid_token(&self.oauth_config()).await?;
+        HeaderValue::from_str(&format!("Bearer {}", token))
+            .map_err(|e| ProviderError::Other(format!("Invalid token: {}", e)))
+    }
+
+    /// Check if authenticated
+    pub fn is_authenticated(&self) -> bool {
+        self.oauth_manager.has_tokens(OAuthProvider::Dropbox)
+    }
+
+    /// Start OAuth flow
+    pub async fn start_auth(&self) -> Result<(String, String), ProviderError> {
+        self.oauth_manager.start_auth_flow(&self.oauth_config()).await
+    }
+
+    /// Complete OAuth flow
+    pub async fn complete_auth(&self, code: &str, state: &str) -> Result<(), ProviderError> {
+        self.oauth_manager.complete_auth_flow(&self.oauth_config(), code, state).await?;
+        Ok(())
+    }
+
+    /// Normalize path for Dropbox API (empty string = root, paths start with /)
+    fn normalize_path(&self, path: &str) -> String {
+        let path = path.trim_matches('/');
+        if path.is_empty() {
+            "".to_string()
+        } else {
+            format!("/{}", path)
+        }
+    }
+
+    /// Convert Dropbox metadata to RemoteEntry
+    fn to_remote_entry(&self, meta: &DropboxMetadata) -> RemoteEntry {
+        let is_dir = meta.tag == "folder";
+        let path = meta.path_display.clone()
+            .unwrap_or_else(|| meta.path_lower.clone().unwrap_or_default());
+
+        RemoteEntry {
+            name: meta.name.clone(),
+            path,
+            is_dir,
+            size: meta.size,
+            modified: meta.server_modified.clone(),
+            permissions: None,
+            owner: None,
+            group: None,
+            is_symlink: false,
+            link_target: None,
+            mime_type: None,
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Make API call with RPC style
+    async fn rpc_call<T: serde::de::DeserializeOwned>(
+        &self,
+        endpoint: &str,
+        body: &serde_json::Value,
+    ) -> Result<T, ProviderError> {
+        let url = format!("{}/{}", API_BASE, endpoint);
+        
+        let response = self.client
+            .post(&url)
+            .header(AUTHORIZATION, self.auth_header().await?)
+            .header(CONTENT_TYPE, "application/json")
+            .body(body.to_string())
+            .send()
+            .await
+            .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            
+            // Check for path not found error
+            if text.contains("path/not_found") {
+                return Err(ProviderError::NotFound(text));
+            }
+            
+            return Err(ProviderError::Other(format!("API error {}: {}", status, text)));
+        }
+
+        response.json().await
+            .map_err(|e| ProviderError::Other(format!("Parse error: {}", e)))
+    }
+
+    /// List folder with pagination
+    async fn list_folder_all(&self, path: &str) -> Result<Vec<DropboxMetadata>, ProviderError> {
+        let path = self.normalize_path(path);
+        
+        let body = serde_json::json!({
+            "path": path,
+            "recursive": false,
+            "include_deleted": false,
+            "include_has_explicit_shared_members": false,
+            "include_mounted_folders": true
+        });
+
+        let mut result: ListFolderResult = self.rpc_call("files/list_folder", &body).await?;
+        let mut all_entries = result.entries;
+
+        while result.has_more {
+            let continue_body = serde_json::json!({
+                "cursor": result.cursor
+            });
+            result = self.rpc_call("files/list_folder/continue", &continue_body).await?;
+            all_entries.extend(result.entries);
+        }
+
+        Ok(all_entries)
+    }
+}
+
+#[async_trait]
+impl StorageProvider for DropboxProvider {
+    fn provider_type(&self) -> ProviderType {
+        ProviderType::Dropbox
+    }
+
+    fn display_name(&self) -> String {
+        "Dropbox".to_string()
+    }
+
+    async fn connect(&mut self) -> Result<(), ProviderError> {
+        if !self.is_authenticated() {
+            return Err(ProviderError::AuthenticationFailed(
+                "Not authenticated. Call start_auth() first.".to_string()
+            ));
+        }
+
+        // Validate by getting account info
+        let body = serde_json::json!(null);
+        let url = format!("{}/users/get_current_account", API_BASE);
+        
+        let response = self.client
+            .post(&url)
+            .header(AUTHORIZATION, self.auth_header().await?)
+            .send()
+            .await
+            .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(ProviderError::AuthenticationFailed("Invalid token".to_string()));
+        }
+
+        self.connected = true;
+        self.current_path = "".to_string();
+        
+        info!("Connected to Dropbox");
+        Ok(())
+    }
+
+    async fn disconnect(&mut self) -> Result<(), ProviderError> {
+        self.connected = false;
+        info!("Disconnected from Dropbox");
+        Ok(())
+    }
+
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
+
+    async fn list(&mut self, path: &str) -> Result<Vec<RemoteEntry>, ProviderError> {
+        let list_path = if path == "." || path.is_empty() {
+            self.current_path.clone()
+        } else if path.starts_with('/') {
+            path.trim_matches('/').to_string()
+        } else {
+            format!("{}/{}", self.current_path.trim_matches('/'), path)
+        };
+
+        let entries = self.list_folder_all(&list_path).await?;
+        Ok(entries.iter().map(|e| self.to_remote_entry(e)).collect())
+    }
+
+    async fn pwd(&mut self) -> Result<String, ProviderError> {
+        if self.current_path.is_empty() {
+            Ok("/".to_string())
+        } else {
+            Ok(format!("/{}", self.current_path))
+        }
+    }
+
+    async fn cd(&mut self, path: &str) -> Result<(), ProviderError> {
+        let new_path = if path.starts_with('/') {
+            path.trim_matches('/').to_string()
+        } else if path == ".." {
+            let mut parts: Vec<&str> = self.current_path.split('/').filter(|s| !s.is_empty()).collect();
+            parts.pop();
+            parts.join("/")
+        } else {
+            if self.current_path.is_empty() {
+                path.to_string()
+            } else {
+                format!("{}/{}", self.current_path, path)
+            }
+        };
+
+        // Verify path exists (skip for root)
+        if !new_path.is_empty() {
+            let db_path = self.normalize_path(&new_path);
+            let body = serde_json::json!({
+                "path": db_path
+            });
+            
+            let meta: DropboxMetadata = self.rpc_call("files/get_metadata", &body).await?;
+            if meta.tag != "folder" {
+                return Err(ProviderError::InvalidPath(format!("{} is not a folder", path)));
+            }
+        }
+
+        self.current_path = new_path;
+        Ok(())
+    }
+
+    async fn cd_up(&mut self) -> Result<(), ProviderError> {
+        self.cd("..").await
+    }
+
+    async fn download(
+        &mut self,
+        remote_path: &str,
+        local_path: &str,
+        _on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+    ) -> Result<(), ProviderError> {
+        let path = self.normalize_path(remote_path);
+        
+        let arg = serde_json::json!({
+            "path": path
+        });
+
+        let url = format!("{}/files/download", CONTENT_BASE);
+        
+        let response = self.client
+            .post(&url)
+            .header(AUTHORIZATION, self.auth_header().await?)
+            .header("Dropbox-API-Arg", arg.to_string())
+            .send()
+            .await
+            .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let text = response.text().await.unwrap_or_default();
+            return Err(ProviderError::Other(format!("Download failed: {}", text)));
+        }
+
+        let bytes = response.bytes().await
+            .map_err(|e| ProviderError::Other(format!("Read error: {}", e)))?;
+
+        let _: () = tokio::fs::write(local_path, &bytes).await
+            .map_err(|e| ProviderError::Other(format!("Write error: {}", e)))?;
+
+        info!("Downloaded {} to {}", remote_path, local_path);
+        Ok(())
+    }
+
+    async fn download_to_bytes(&mut self, remote_path: &str) -> Result<Vec<u8>, ProviderError> {
+        let path = self.normalize_path(remote_path);
+        
+        let arg = serde_json::json!({
+            "path": path
+        });
+
+        let url = format!("{}/files/download", CONTENT_BASE);
+        
+        let response = self.client
+            .post(&url)
+            .header(AUTHORIZATION, self.auth_header().await?)
+            .header("Dropbox-API-Arg", arg.to_string())
+            .send()
+            .await
+            .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+        let bytes = response.bytes().await
+            .map_err(|e| ProviderError::Other(format!("Read error: {}", e)))?;
+
+        Ok(bytes.to_vec())
+    }
+
+    async fn upload(
+        &mut self,
+        local_path: &str,
+        remote_path: &str,
+        _on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+    ) -> Result<(), ProviderError> {
+        let content = tokio::fs::read(local_path).await
+            .map_err(|e| ProviderError::Other(format!("Read error: {}", e)))?;
+
+        let path = self.normalize_path(remote_path);
+        
+        let arg = serde_json::json!({
+            "path": path,
+            "mode": "overwrite",
+            "autorename": false,
+            "mute": false
+        });
+
+        let url = format!("{}/files/upload", CONTENT_BASE);
+        
+        let response = self.client
+            .post(&url)
+            .header(AUTHORIZATION, self.auth_header().await?)
+            .header(CONTENT_TYPE, "application/octet-stream")
+            .header("Dropbox-API-Arg", arg.to_string())
+            .body(content)
+            .send()
+            .await
+            .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let text = response.text().await.unwrap_or_default();
+            return Err(ProviderError::Other(format!("Upload failed: {}", text)));
+        }
+
+        info!("Uploaded {} to {}", local_path, remote_path);
+        Ok(())
+    }
+
+    async fn mkdir(&mut self, path: &str) -> Result<(), ProviderError> {
+        let full_path = if path.starts_with('/') {
+            self.normalize_path(path)
+        } else {
+            self.normalize_path(&format!("{}/{}", self.current_path, path))
+        };
+
+        let body = serde_json::json!({
+            "path": full_path,
+            "autorename": false
+        });
+
+        let _: serde_json::Value = self.rpc_call("files/create_folder_v2", &body).await?;
+        
+        info!("Created folder: {}", path);
+        Ok(())
+    }
+
+    async fn delete(&mut self, path: &str) -> Result<(), ProviderError> {
+        let full_path = if path.starts_with('/') {
+            self.normalize_path(path)
+        } else {
+            self.normalize_path(&format!("{}/{}", self.current_path, path))
+        };
+
+        let body = serde_json::json!({
+            "path": full_path
+        });
+
+        let _: serde_json::Value = self.rpc_call("files/delete_v2", &body).await?;
+        
+        info!("Deleted: {}", path);
+        Ok(())
+    }
+
+    async fn rmdir(&mut self, path: &str) -> Result<(), ProviderError> {
+        self.delete(path).await
+    }
+
+    async fn rmdir_recursive(&mut self, path: &str) -> Result<(), ProviderError> {
+        // Dropbox delete removes folders with contents
+        self.delete(path).await
+    }
+
+    async fn rename(&mut self, from: &str, to: &str) -> Result<(), ProviderError> {
+        let from_path = if from.starts_with('/') {
+            self.normalize_path(from)
+        } else {
+            self.normalize_path(&format!("{}/{}", self.current_path, from))
+        };
+
+        let to_path = if to.starts_with('/') {
+            self.normalize_path(to)
+        } else {
+            self.normalize_path(&format!("{}/{}", self.current_path, to))
+        };
+
+        let body = serde_json::json!({
+            "from_path": from_path,
+            "to_path": to_path
+        });
+
+        let _: serde_json::Value = self.rpc_call("files/move_v2", &body).await?;
+        
+        info!("Renamed {} to {}", from, to);
+        Ok(())
+    }
+
+    async fn stat(&mut self, path: &str) -> Result<RemoteEntry, ProviderError> {
+        let full_path = if path.starts_with('/') {
+            self.normalize_path(path)
+        } else {
+            self.normalize_path(&format!("{}/{}", self.current_path, path))
+        };
+
+        let body = serde_json::json!({
+            "path": full_path
+        });
+
+        let meta: DropboxMetadata = self.rpc_call("files/get_metadata", &body).await?;
+        Ok(self.to_remote_entry(&meta))
+    }
+
+    async fn size(&mut self, path: &str) -> Result<u64, ProviderError> {
+        let entry = self.stat(path).await?;
+        Ok(entry.size)
+    }
+
+    async fn exists(&mut self, path: &str) -> Result<bool, ProviderError> {
+        match self.stat(path).await {
+            Ok(_) => Ok(true),
+            Err(ProviderError::NotFound(_)) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+
+    async fn keep_alive(&mut self) -> Result<(), ProviderError> {
+        Ok(())
+    }
+
+    async fn server_info(&mut self) -> Result<String, ProviderError> {
+        Ok("Dropbox API v2".to_string())
+    }
+}
