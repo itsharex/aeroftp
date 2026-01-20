@@ -1,11 +1,13 @@
 // AeroCloud Sync Service
 // Background synchronization between local and remote folders
+// Supports multi-protocol providers: FTP, WebDAV, S3, etc.
 // NOTE: Some items prepared for Phase 5+ background sync loop
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
 use crate::cloud_config::{CloudConfig, CloudSyncStatus, ConflictStrategy};
 use crate::ftp::FtpManager;
+use crate::providers::{StorageProvider, RemoteEntry as ProviderRemoteEntry, ProviderError};
 use crate::sync::{
     build_comparison_results, CompareOptions, FileComparison, FileInfo, SyncAction, SyncDirection,
     SyncStatus,
@@ -178,6 +180,123 @@ impl CloudService {
             }).await;
 
             match self.process_comparison(ftp_manager, &config, comparison).await {
+                Ok(action) => match action {
+                    SyncAction::Upload => result.uploaded += 1,
+                    SyncAction::Download => result.downloaded += 1,
+                    SyncAction::DeleteLocal | SyncAction::DeleteRemote => result.deleted += 1,
+                    SyncAction::Skip => result.skipped += 1,
+                    SyncAction::AskUser => {
+                        result.conflicts += 1;
+                        // Add to conflicts list
+                        let mut conflicts = self.conflicts.write().await;
+                        conflicts.push(FileConflict {
+                            relative_path: comparison.relative_path.clone(),
+                            local_modified: comparison.local_info.as_ref().and_then(|i| i.modified),
+                            remote_modified: comparison.remote_info.as_ref().and_then(|i| i.modified),
+                            local_size: comparison.local_info.as_ref().map(|i| i.size).unwrap_or(0),
+                            remote_size: comparison.remote_info.as_ref().map(|i| i.size).unwrap_or(0),
+                            status: comparison.status.clone(),
+                        });
+                    }
+                },
+                Err(e) => {
+                    result.errors.push(format!("{}: {}", comparison.relative_path, e));
+                }
+            }
+        }
+
+        result.duration_secs = start_time.elapsed().as_secs();
+
+        // Update config with last sync time
+        {
+            let mut cfg = self.config.write().await;
+            cfg.last_sync = Some(Utc::now());
+            let _ = crate::cloud_config::save_cloud_config(&cfg);
+        }
+
+        // Update status
+        if result.conflicts > 0 {
+            self.set_status(CloudSyncStatus::HasConflicts {
+                count: result.conflicts,
+            }).await;
+        } else if !result.errors.is_empty() {
+            self.set_status(CloudSyncStatus::Error {
+                message: format!("{} errors during sync", result.errors.len()),
+            }).await;
+        } else {
+            self.set_status(CloudSyncStatus::Idle {
+                last_sync: Some(Utc::now()),
+                next_sync: None,
+            }).await;
+        }
+
+        // Emit sync complete event
+        if let Some(app) = &self.app_handle {
+            let _ = app.emit("cloud_sync_complete", &result);
+        }
+
+        Ok(result)
+    }
+
+    /// Perform a full sync using any StorageProvider (multi-protocol support)
+    /// This is the new unified sync method that works with FTP, WebDAV, S3, etc.
+    pub async fn perform_full_sync_with_provider<P: StorageProvider + ?Sized>(
+        &self,
+        provider: &mut P,
+    ) -> Result<SyncOperationResult, String> {
+        let config = self.config.read().await.clone();
+        
+        if !config.enabled {
+            return Err("AeroCloud is not enabled".to_string());
+        }
+
+        let start_time = std::time::Instant::now();
+        
+        // Update status to syncing
+        self.set_status(CloudSyncStatus::Syncing {
+            current_file: "Scanning files...".to_string(),
+            progress: 0.0,
+            files_done: 0,
+            files_total: 0,
+        }).await;
+
+        // Get file listings
+        let local_files = self.scan_local_folder(&config).await?;
+        let remote_files = self.scan_remote_folder_with_provider(provider, &config).await?;
+
+        // Build comparison
+        let options = CompareOptions {
+            compare_timestamp: true,
+            compare_size: true,
+            compare_checksum: false,
+            exclude_patterns: config.exclude_patterns.clone(),
+            direction: SyncDirection::Bidirectional,
+        };
+
+        let comparisons = build_comparison_results(local_files, remote_files, &options);
+        
+        let total_files = comparisons.len() as u32;
+        let mut result = SyncOperationResult {
+            uploaded: 0,
+            downloaded: 0,
+            deleted: 0,
+            skipped: 0,
+            conflicts: 0,
+            errors: Vec::new(),
+            duration_secs: 0,
+        };
+
+        // Process each comparison
+        for (index, comparison) in comparisons.iter().enumerate() {
+            // Update progress
+            self.set_status(CloudSyncStatus::Syncing {
+                current_file: comparison.relative_path.clone(),
+                progress: (index as f64 / total_files.max(1) as f64) * 100.0,
+                files_done: index as u32,
+                files_total: total_files,
+            }).await;
+
+            match self.process_comparison_with_provider(provider, &config, comparison).await {
                 Ok(action) => match action {
                     SyncAction::Upload => result.uploaded += 1,
                     SyncAction::Download => result.downloaded += 1,
@@ -456,6 +575,161 @@ impl CloudService {
                             &local_path.to_string_lossy(),
                             |_| {},
                         )
+                        .await
+                        .map_err(|e| format!("Download failed: {}", e))?;
+                }
+            }
+            _ => {}
+        }
+
+        Ok(action)
+    }
+
+    /// Scan remote folder using any StorageProvider (multi-protocol support)
+    async fn scan_remote_folder_with_provider<P: StorageProvider + ?Sized>(
+        &self,
+        provider: &mut P,
+        config: &CloudConfig,
+    ) -> Result<HashMap<String, FileInfo>, String> {
+        let mut files = HashMap::new();
+        let base_path = &config.remote_folder;
+
+        // Stack-based recursive scan
+        let mut stack = vec![(base_path.clone(), String::new())];
+
+        while let Some((current_path, relative_prefix)) = stack.pop() {
+            // Navigate to directory
+            if provider.cd(&current_path).await.is_err() {
+                continue;
+            }
+
+            // List files using provider
+            let entries = match provider.list(".").await {
+                Ok(list) => list,
+                Err(_) => continue,
+            };
+
+            for entry in entries {
+                let relative_path = if relative_prefix.is_empty() {
+                    entry.name.clone()
+                } else {
+                    format!("{}/{}", relative_prefix, entry.name)
+                };
+
+                // Check exclusions
+                if crate::sync::should_exclude(&relative_path, &config.exclude_patterns) {
+                    continue;
+                }
+
+                files.insert(
+                    relative_path.clone(),
+                    FileInfo {
+                        name: entry.name.clone(),
+                        path: format!("{}/{}", current_path, entry.name),
+                        size: entry.size,
+                        modified: entry.modified.and_then(|s| {
+                            DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc))
+                        }),
+                        is_dir: entry.is_dir,
+                        checksum: None,
+                    },
+                );
+
+                if entry.is_dir {
+                    stack.push((
+                        format!("{}/{}", current_path, entry.name),
+                        relative_path,
+                    ));
+                }
+            }
+        }
+
+        Ok(files)
+    }
+
+    /// Process a single file comparison using any StorageProvider
+    async fn process_comparison_with_provider<P: StorageProvider + ?Sized>(
+        &self,
+        provider: &mut P,
+        config: &CloudConfig,
+        comparison: &FileComparison,
+    ) -> Result<SyncAction, String> {
+        // Determine action based on status and conflict strategy
+        let action = match &comparison.status {
+            SyncStatus::Identical => SyncAction::Skip,
+            SyncStatus::LocalNewer => SyncAction::Upload,
+            SyncStatus::RemoteNewer => SyncAction::Download,
+            SyncStatus::LocalOnly => SyncAction::Upload,
+            SyncStatus::RemoteOnly => SyncAction::Download,
+            SyncStatus::Conflict | SyncStatus::SizeMismatch => {
+                match config.conflict_strategy {
+                    ConflictStrategy::AskUser => SyncAction::AskUser,
+                    ConflictStrategy::KeepBoth => {
+                        // TODO: Implement keep both logic
+                        SyncAction::AskUser
+                    }
+                    ConflictStrategy::PreferLocal => SyncAction::Upload,
+                    ConflictStrategy::PreferRemote => SyncAction::Download,
+                    ConflictStrategy::PreferNewer => {
+                        // Compare timestamps
+                        let local_time = comparison.local_info.as_ref().and_then(|i| i.modified);
+                        let remote_time = comparison.remote_info.as_ref().and_then(|i| i.modified);
+                        match (local_time, remote_time) {
+                            (Some(l), Some(r)) if l > r => SyncAction::Upload,
+                            (Some(l), Some(r)) if r > l => SyncAction::Download,
+                            _ => SyncAction::AskUser,
+                        }
+                    }
+                }
+            }
+        };
+
+        // Execute action using provider methods
+        match &action {
+            SyncAction::Upload => {
+                let remote_path = format!(
+                    "{}/{}",
+                    config.remote_folder.trim_end_matches('/'),
+                    comparison.relative_path
+                );
+                
+                if comparison.is_dir {
+                    // Create remote directory
+                    if let Err(e) = provider.mkdir(&remote_path).await {
+                        // Directory might already exist, log but don't fail
+                        tracing::debug!("mkdir {} (may exist): {}", remote_path, e);
+                    }
+                } else if let Some(local_info) = &comparison.local_info {
+                    // Ensure parent directory exists on remote
+                    if let Some(parent) = std::path::Path::new(&comparison.relative_path).parent() {
+                        let parent_path = format!(
+                            "{}/{}",
+                            config.remote_folder.trim_end_matches('/'),
+                            parent.to_string_lossy()
+                        );
+                        let _ = provider.mkdir(&parent_path).await;
+                    }
+                    
+                    provider
+                        .upload(&local_info.path, &remote_path, None)
+                        .await
+                        .map_err(|e| format!("Upload failed: {}", e))?;
+                }
+            }
+            SyncAction::Download => {
+                let local_path = config.local_folder.join(&comparison.relative_path);
+                
+                if comparison.is_dir {
+                    // Create local directory
+                    std::fs::create_dir_all(&local_path).ok();
+                } else if let Some(remote_info) = &comparison.remote_info {
+                    // Ensure parent directory exists
+                    if let Some(parent) = local_path.parent() {
+                        std::fs::create_dir_all(parent).ok();
+                    }
+                    
+                    provider
+                        .download(&remote_info.path, &local_path.to_string_lossy(), None)
                         .await
                         .map_err(|e| format!("Download failed: {}", e))?;
                 }

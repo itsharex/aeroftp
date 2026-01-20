@@ -15,6 +15,7 @@ mod cloud_config;
 mod watcher;
 mod cloud_service;
 mod providers;
+mod provider_commands;
 #[cfg(unix)]
 mod pty;
 
@@ -2700,7 +2701,8 @@ pub fn run() {
                 }
             }
         })
-        .manage(AppState::new());
+        .manage(AppState::new())
+        .manage(provider_commands::ProviderState::new());
 
     // Add PTY state only on Unix systems
     #[cfg(unix)]
@@ -2759,6 +2761,25 @@ pub fn run() {
             ai_chat,
             ai_test_provider,
             ai_execute_tool,
+            // Multi-protocol provider commands
+            provider_commands::provider_connect,
+            provider_commands::provider_disconnect,
+            provider_commands::provider_check_connection,
+            provider_commands::provider_list_files,
+            provider_commands::provider_change_dir,
+            provider_commands::provider_go_up,
+            provider_commands::provider_pwd,
+            provider_commands::provider_download_file,
+            provider_commands::provider_upload_file,
+            provider_commands::provider_mkdir,
+            provider_commands::provider_delete_file,
+            provider_commands::provider_delete_dir,
+            provider_commands::provider_rename,
+            provider_commands::provider_stat,
+            provider_commands::provider_keep_alive,
+            provider_commands::provider_server_info,
+            provider_commands::provider_file_size,
+            provider_commands::provider_exists,
             #[cfg(unix)]
             spawn_shell,
             #[cfg(unix)]

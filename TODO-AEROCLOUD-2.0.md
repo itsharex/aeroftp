@@ -73,27 +73,13 @@ Transform AeroFTP from a pure FTP client into a **Universal Cloud Storage Browse
 - [x] Add S3-specific fields (bucket, region, endpoint)
 - [x] Add WebDAV hints and documentation
 
-#### 3. Backend - Integration (TODO)
-- [ ] Add Tauri commands for protocol-specific connection
-- [ ] Update `connect_ftp` command to use provider factory
-- [ ] Route file operations through provider abstraction
-- [ ] Update AeroCloud sync to work with any provider
-
-#### 4. Testing & Documentation (TODO)
-- [ ] Test with Nextcloud (WebDAV)
-- [ ] Test with MinIO (S3-compatible)
-- [ ] Test with AWS S3
-- [ ] Update README with new features
-
-#### 2. Backend - Integration
-- [ ] Update `lib.rs` to use provider abstraction
-- [ ] Add Tauri commands for protocol selection
-- [ ] Update AeroCloud sync to work with any provider
-
-#### 3. Frontend - Protocol Selection
-- [ ] Add protocol dropdown in connection dialog
-- [ ] Update connection form for protocol-specific fields
-- [ ] Add provider icons (FTP, WebDAV, S3, etc.)
+#### 3. Backend - Integration (Tauri Commands)
+- [x] Create `provider_commands.rs` with Tauri commands
+- [x] Add ProviderState for active provider management  
+- [x] Register all provider commands in invoke_handler
+- [x] Create `useProvider.ts` React hook
+- [x] Wire up frontend to use provider commands instead of FTP-only
+- [x] Update AeroCloud sync to work with any provider
 
 #### 4. Testing & Documentation
 - [ ] Test with Nextcloud (WebDAV)
