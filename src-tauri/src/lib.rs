@@ -14,6 +14,7 @@ mod ai;
 mod cloud_config;
 mod watcher;
 mod cloud_service;
+mod providers;
 #[cfg(unix)]
 mod pty;
 

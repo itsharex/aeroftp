@@ -6,9 +6,10 @@
 import React from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { FolderOpen, HardDrive, ChevronRight } from 'lucide-react';
-import { ConnectionParams } from '../types';
+import { ConnectionParams, ProviderType } from '../types';
 import { SavedServers } from './SavedServers';
 import { useTranslation } from '../i18n';
+import { ProtocolSelector, ProtocolFields, getDefaultPort } from './ProtocolSelector';
 
 interface QuickConnectDirs {
     remoteDir: string;
@@ -37,6 +38,7 @@ export const ConnectionScreen: React.FC<ConnectionScreenProps> = ({
     onSkipToFileManager,
 }) => {
     const t = useTranslation();
+    const protocol = connectionParams.protocol || 'ftp';
 
     const handleBrowseLocalDir = async () => {
         try {
@@ -49,34 +51,75 @@ export const ConnectionScreen: React.FC<ConnectionScreenProps> = ({
         }
     };
 
+    const handleProtocolChange = (newProtocol: ProviderType) => {
+        onConnectionParamsChange({
+            ...connectionParams,
+            protocol: newProtocol,
+            port: getDefaultPort(newProtocol),
+        });
+    };
+
+    // Dynamic server placeholder based on protocol
+    const getServerPlaceholder = () => {
+        switch (protocol) {
+            case 'webdav':
+                return 'cloud.example.com/remote.php/dav/files/user/';
+            case 's3':
+                return 's3.amazonaws.com (or MinIO endpoint)';
+            default:
+                return t('connection.serverPlaceholder');
+        }
+    };
+
+    // Dynamic username label based on protocol
+    const getUsernameLabel = () => {
+        if (protocol === 's3') return 'Access Key ID';
+        return t('connection.username');
+    };
+
+    // Dynamic password label based on protocol
+    const getPasswordLabel = () => {
+        if (protocol === 's3') return 'Secret Access Key';
+        return t('connection.password');
+    };
+
     return (
         <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-6">
             {/* Quick Connect */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6">
                 <h2 className="text-xl font-semibold mb-4">{t('connection.quickConnect')}</h2>
                 <div className="space-y-3">
+                    {/* Protocol Selector */}
+                    <ProtocolSelector
+                        value={protocol}
+                        onChange={handleProtocolChange}
+                        disabled={loading}
+                    />
+
                     <div>
-                        <label className="block text-sm font-medium mb-1.5">{t('connection.server')}</label>
+                        <label className="block text-sm font-medium mb-1.5">
+                            {protocol === 's3' ? 'Endpoint' : t('connection.server')}
+                        </label>
                         <input
                             type="text"
                             value={connectionParams.server}
                             onChange={(e) => onConnectionParamsChange({ ...connectionParams, server: e.target.value })}
                             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl"
-                            placeholder={t('connection.serverPlaceholder')}
+                            placeholder={getServerPlaceholder()}
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1.5">{t('connection.username')}</label>
+                        <label className="block text-sm font-medium mb-1.5">{getUsernameLabel()}</label>
                         <input
                             type="text"
                             value={connectionParams.username}
                             onChange={(e) => onConnectionParamsChange({ ...connectionParams, username: e.target.value })}
                             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl"
-                            placeholder={t('connection.usernamePlaceholder')}
+                            placeholder={protocol === 's3' ? 'AKIAIOSFODNN7EXAMPLE' : t('connection.usernamePlaceholder')}
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1.5">{t('connection.password')}</label>
+                        <label className="block text-sm font-medium mb-1.5">{getPasswordLabel()}</label>
                         <input
                             type="password"
                             value={connectionParams.password}
@@ -85,6 +128,15 @@ export const ConnectionScreen: React.FC<ConnectionScreenProps> = ({
                             placeholder={t('connection.passwordPlaceholder')}
                         />
                     </div>
+
+                    {/* Protocol-specific fields */}
+                    <ProtocolFields
+                        protocol={protocol}
+                        options={connectionParams.options || {}}
+                        onChange={(options) => onConnectionParamsChange({ ...connectionParams, options })}
+                        disabled={loading}
+                    />
+
                     <div>
                         <label className="block text-sm font-medium mb-1.5">{t('browser.remote')} {t('browser.path')}</label>
                         <input
@@ -92,7 +144,7 @@ export const ConnectionScreen: React.FC<ConnectionScreenProps> = ({
                             value={quickConnectDirs.remoteDir}
                             onChange={(e) => onQuickConnectDirsChange({ ...quickConnectDirs, remoteDir: e.target.value })}
                             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl"
-                            placeholder="/www"
+                            placeholder={protocol === 's3' ? '/prefix/' : '/www'}
                         />
                     </div>
                     <div>
@@ -117,7 +169,7 @@ export const ConnectionScreen: React.FC<ConnectionScreenProps> = ({
                     </div>
                     <button
                         onClick={onConnect}
-                        disabled={loading}
+                        disabled={loading || (protocol === 's3' && !connectionParams.options?.bucket)}
                         className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium py-3 rounded-xl disabled:opacity-50"
                     >
                         {loading ? t('connection.connecting') : t('common.connect')}

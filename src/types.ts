@@ -13,10 +13,28 @@ export interface FileListResponse {
   current_path: string;
 }
 
+// Supported storage provider types
+export type ProviderType = 'ftp' | 'ftps' | 'sftp' | 'webdav' | 's3';
+
+// Provider-specific configuration options
+export interface ProviderOptions {
+  // S3-specific
+  bucket?: string;
+  region?: string;
+  endpoint?: string;  // For S3-compatible (MinIO, etc.)
+  pathStyle?: boolean;
+
+  // WebDAV-specific
+  // (no extra options needed, uses standard auth)
+}
+
 export interface ConnectionParams {
   server: string;
   username: string;
   password: string;
+  protocol?: ProviderType;  // Default: 'ftp'
+  port?: number;            // Default based on protocol
+  options?: ProviderOptions;
 }
 
 export interface DownloadParams {
@@ -62,14 +80,14 @@ export interface TransferProgress {
 
 // Transfer event from backend (includes transfers and deletes)
 export interface TransferEvent {
-  event_type: 
-    // Transfer events
-    | 'start' | 'progress' | 'complete' | 'error' | 'cancelled'
-    | 'file_start' | 'file_complete' | 'file_error'
-    // Delete events
-    | 'delete_start' | 'delete_complete' | 'delete_error'
-    | 'delete_file_start' | 'delete_file_complete' | 'delete_file_error'
-    | 'delete_dir_complete';
+  event_type:
+  // Transfer events
+  | 'start' | 'progress' | 'complete' | 'error' | 'cancelled'
+  | 'file_start' | 'file_complete' | 'file_error'
+  // Delete events
+  | 'delete_start' | 'delete_complete' | 'delete_error'
+  | 'delete_file_start' | 'delete_file_complete' | 'delete_file_error'
+  | 'delete_dir_complete';
   transfer_id: string;
   filename: string;
   direction: 'download' | 'upload' | 'local' | 'remote';
@@ -85,10 +103,12 @@ export interface ServerProfile {
   port: number;
   username: string;
   password?: string;
+  protocol?: ProviderType;    // Default: 'ftp'
   initialPath?: string;       // Initial remote directory to navigate after connection
   localInitialPath?: string;  // Initial local directory for this project/server
   color?: string;
   lastConnected?: string;
+  options?: ProviderOptions;  // Provider-specific options (S3 bucket, etc.)
 }
 
 // App state

@@ -39,5 +39,16 @@ notify = { version = "6", default-features = true }
 notify-debouncer-mini = "0.4"
 tauri-plugin-single-instance = "2.3.6"
 
+# Multi-provider cloud storage support
+async-trait = "0.1"
+regex = "1"
+urlencoding = "2"
+url = "2"
+
+# S3 Signature V4 signing
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+
 [features]
 custom-protocol = ["tauri/custom-protocol"]
