@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  A modern, cross-platform FTP/FTPS client built with Rust and React.
+  A modern, cross-platform FTP/FTPS and Cloud Storage client built with Rust and React.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.1.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.2.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green" alt="Platform">
   <img src="https://img.shields.io/badge/Built%20with-Tauri%202.0%20%2B%20React%2018-purple" alt="Built with">
   <img src="https://img.shields.io/badge/License-GPL--3.0-orange" alt="License">
@@ -37,6 +37,17 @@
 | **FTPS Support** | Secure FTP over TLS |
 | **Async Transfers** | Non-blocking with progress tracking |
 | **Folder Recursion** | Full recursive upload/download/delete |
+
+### ☁️ Multi-Provider Support (NEW in 1.2.0)
+| Provider | Status | Features |
+|----------|--------|----------|
+| **FTP/FTPS** | ✅ Full | Browse, upload, download, sync |
+| **SFTP** | ✅ Full | SSH-based secure transfers |
+| **Google Drive** | ✅ Full | OAuth2, browse, upload, download |
+| **WebDAV** | 🔄 Beta | Nextcloud, ownCloud compatible |
+| **S3** | 🔄 Beta | AWS, MinIO, Backblaze B2, R2 |
+| **Dropbox** | 📋 Planned | Coming in v1.3.0 |
+| **OneDrive** | 📋 Planned | Coming in v1.3.0 |
 
 ### 🔗 Navigation Sync (NEW in 0.9.9)
 - **Per-session sync** - Each tab maintains its own sync state
@@ -142,22 +153,24 @@ npm run tauri build
 
 ---
 
-## 📝 Changelog v0.9.9
+## 📝 Changelog v1.2.0
 
 ### ✨ New Features
-- **Per-session Navigation Sync** - Each tab maintains independent sync state
-- **Path Coherence Check** - Warning when local/remote paths don't match
-- **AeroCloud Log Filter** - Toggle to hide/show cloud sync messages
-- **Tab Switch Logging** - Reconnection status in Activity Log
-
-### 🐛 Bug Fixes
-- Fixed local path not restoring on tab switch
-- Fixed navigation sync staying active on new connections
-- Fixed folder progress badge showing bytes instead of file count
+- **Google Drive Integration** - Full OAuth2 support with browse, upload, download
+- **Multi-Provider Architecture** - Unified interface for FTP, SFTP, WebDAV, S3, and cloud providers
+- **Protocol Selector** - Easy switch between connection types
+- **Provider Tab Icons** - Visual distinction for each provider type
+- **OAuth Settings Panel** - Configure API credentials from Settings
 
 ### 🔧 Improvements
-- Explicit state capture before session switch (race condition fix)
-- Better error handling for reconnection failures
+- New `StorageProvider` trait for extensible backend
+- Session-based provider management
+- Improved error handling for OAuth flows
+
+### 📋 Coming Soon (v1.3.0)
+- Dropbox, OneDrive, MEGA.nz
+- Multi-session parallel connections
+- Client-side encryption (Cryptomator-compatible)
 
 ---
 
