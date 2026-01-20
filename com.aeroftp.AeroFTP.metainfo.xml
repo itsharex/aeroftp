@@ -71,6 +71,18 @@
   </languages>
   
   <releases>
+    <release version="1.1.0" date="2026-01-20">
+      <description>
+        <p>🌐 Multi-Protocol Cloud Storage (Sprint 1)</p>
+        <ul>
+          <li>WebDAV support - Nextcloud, ownCloud, and any WebDAV server</li>
+          <li>S3 support - AWS S3, MinIO, Backblaze B2, Cloudflare R2</li>
+          <li>Protocol selector in connection screen</li>
+          <li>AeroCloud sync now works with any provider</li>
+          <li>New unified storage provider architecture</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-01-20">
       <description>
         <p>🎉 First stable release!</p>

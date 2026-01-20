@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-01-20
+
+### 🌐 Multi-Protocol Cloud Storage (Sprint 1)
+
+AeroFTP now supports multiple cloud storage protocols beyond FTP!
+
+#### Added
+- **WebDAV Support**: Connect to Nextcloud, ownCloud, and any WebDAV server
+- **S3 Support**: Connect to AWS S3, MinIO, Backblaze B2, Cloudflare R2, and S3-compatible storage
+- **Protocol Selector**: New dropdown in connection screen to choose protocol (FTP/FTPS/WebDAV/S3)
+- **S3-specific fields**: Bucket, region, and custom endpoint configuration
+- **`useProvider` hook**: Unified React hook for multi-protocol operations
+- **`useConnection` hook**: Backward-compatible connection wrapper
+- **`StorageProvider` trait**: Rust abstraction for all storage backends
+- **Provider commands**: Full Tauri command set for provider operations
+
+#### Changed
+- **AeroCloud Sync**: Now works with any storage provider (FTP, WebDAV, S3)
+- **CloudService**: Refactored to use generic `StorageProvider` trait
+
+#### Technical
+- New `providers/` module with FTP, WebDAV, and S3 implementations
+- `provider_commands.rs` with Tauri command bindings
+- Unified `RemoteEntry` type across all providers
+
+---
+
 ## [1.0.0] - 2026-01-20
 
 ### 🎉 First Stable Release
