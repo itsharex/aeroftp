@@ -36,6 +36,10 @@ export interface ProviderOptions {
 
   // WebDAV-specific
   // (no extra options needed, uses standard auth)
+
+  // OAuth-specific (for Google Drive, Dropbox, OneDrive)
+  clientId?: string;
+  clientSecret?: string;
 }
 
 export interface ConnectionParams {

@@ -682,6 +682,19 @@ export const CloudPanel: React.FC<CloudPanelProps> = ({ isOpen, onClose }) => {
                     </div>
 
                     <div className="space-y-4">
+                        {/* Cloud Name - Custom tab display name */}
+                        <div>
+                            <label className="block text-sm font-medium mb-1">{t('cloud.cloudName')}</label>
+                            <input
+                                type="text"
+                                value={config?.cloud_name || ''}
+                                onChange={e => setConfig(prev => prev ? { ...prev, cloud_name: e.target.value } : null)}
+                                className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
+                                placeholder={t('cloud.cloudNamePlaceholder')}
+                            />
+                            <p className="text-xs text-gray-400 mt-1">{t('cloud.cloudNameDesc')}</p>
+                        </div>
+
                         <div>
                             <label className="block text-sm font-medium mb-1">{t('cloud.localFolder')}</label>
                             <input

@@ -215,6 +215,7 @@
             "hoursAgo": "{count}h ago",
             "cloudName": "Cloud Name",
             "cloudNamePlaceholder": "My Cloud",
+            "cloudNameDesc": "Custom name displayed in the tab",
             "selectServer": "Select a saved server...",
             "syncOnChange": "Sync on file change (real-time)",
             "stepFolder": "Choose Folder",

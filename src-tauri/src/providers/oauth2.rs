@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, error};
+use tracing::info;
 
 use super::ProviderError;
 
@@ -391,16 +391,240 @@ pub async fn start_callback_server(port: u16) -> Result<(String, String), Provid
     // Parse the request to extract code and state
     let (code, state) = parse_callback_request(&request)?;
     
-    // Send success response with proper UTF-8 charset
-    let response = "HTTP/1.1 200 OK\r\n\
-        Content-Type: text/html; charset=utf-8\r\n\
-        Connection: close\r\n\r\n\
-        <!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>AeroFTP</title>\
-        <style>body{font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e;color:#fff;}\
-        .box{text-align:center;padding:40px;background:#16213e;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.3);}\
-        h1{color:#00d4ff;margin-bottom:16px;}p{opacity:0.8;}.icon{font-size:48px;margin-bottom:16px;}</style></head>\
-        <body><div class='box'><div class='icon'>&#10004;</div><h1>Authorization Successful</h1>\
-        <p>You can close this window and return to AeroFTP.</p></div></body></html>";
+    // Send success response with proper UTF-8 charset - Professional branded page
+    let response = r#"HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+Connection: close
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AeroFTP - Authorization Complete</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        /* Animated background particles */
+        .bg-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 0;
+        }
+        
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(0, 212, 255, 0.3);
+            border-radius: 50%;
+            animation: float 15s infinite;
+        }
+        
+        .particle:nth-child(1) { left: 10%; animation-delay: 0s; }
+        .particle:nth-child(2) { left: 20%; animation-delay: 2s; }
+        .particle:nth-child(3) { left: 30%; animation-delay: 4s; }
+        .particle:nth-child(4) { left: 40%; animation-delay: 6s; }
+        .particle:nth-child(5) { left: 50%; animation-delay: 8s; }
+        .particle:nth-child(6) { left: 60%; animation-delay: 10s; }
+        .particle:nth-child(7) { left: 70%; animation-delay: 12s; }
+        .particle:nth-child(8) { left: 80%; animation-delay: 14s; }
+        .particle:nth-child(9) { left: 90%; animation-delay: 1s; }
+        .particle:nth-child(10) { left: 95%; animation-delay: 3s; }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(100vh) scale(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) scale(1); opacity: 0; }
+        }
+        
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 60px 50px;
+            background: rgba(22, 33, 62, 0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            max-width: 440px;
+            animation: slideUp 0.6s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Logo */
+        .logo {
+            margin-bottom: 30px;
+        }
+        
+        .logo img {
+            height: 80px;
+            filter: drop-shadow(0 4px 20px rgba(0, 212, 255, 0.4));
+        }
+        
+        .app-name {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00d4ff, #0099ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-top: 12px;
+            letter-spacing: -0.5px;
+        }
+        
+        /* Success icon */
+        .success-icon {
+            width: 90px;
+            height: 90px;
+            margin: 20px auto 30px;
+            background: linear-gradient(135deg, #00d4ff, #00ff88);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: pulse 2s infinite;
+            box-shadow: 0 10px 40px rgba(0, 212, 255, 0.3);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 10px 40px rgba(0, 212, 255, 0.3); }
+            50% { box-shadow: 0 10px 60px rgba(0, 212, 255, 0.5); }
+        }
+        
+        .success-icon svg {
+            width: 45px;
+            height: 45px;
+            stroke: #fff;
+            stroke-width: 3;
+            fill: none;
+            animation: checkmark 0.8s ease-out 0.3s both;
+        }
+        
+        @keyframes checkmark {
+            from { stroke-dashoffset: 50; }
+            to { stroke-dashoffset: 0; }
+        }
+        
+        .success-icon svg path {
+            stroke-dasharray: 50;
+            stroke-dashoffset: 0;
+        }
+        
+        h1 {
+            font-size: 26px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        
+        .provider-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 30px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 30px;
+        }
+        
+        .provider-badge svg {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .close-hint {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .close-hint kbd {
+            display: inline-block;
+            padding: 2px 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+    
+    <div class="container">
+        <div class="logo">
+            <div class="app-name">AeroFTP</div>
+        </div>
+        
+        <div class="success-icon">
+            <svg viewBox="0 0 24 24">
+                <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        
+        <h1>Authorization Successful</h1>
+        <p class="subtitle">Your cloud account has been connected securely.<br>You're all set to access your files!</p>
+        
+        <div class="provider-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            Cloud Storage Connected
+        </div>
+        
+        <p class="close-hint">You can close this window and return to AeroFTP<br>or press <kbd>Alt</kbd> + <kbd>F4</kbd></p>
+    </div>
+    
+    <script>
+        // Auto-close after 5 seconds (optional)
+        // setTimeout(() => window.close(), 5000);
+    </script>
+</body>
+</html>"#;
     
     let _: () = socket.write_all(response.as_bytes())
         .await

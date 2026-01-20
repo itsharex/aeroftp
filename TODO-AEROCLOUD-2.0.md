@@ -1,12 +1,46 @@
 # AeroCloud 2.0 - Multi-Provider Cloud Storage Roadmap
 
 > Created: 20 January 2026
-> Version: AeroFTP 1.0.0 → 1.2.0
-> Status: Sprint 2 Complete (v1.2.0 Released)
+> Version: AeroFTP 1.0.0 → 1.2.3
+> Status: Sprint 2 Complete (v1.2.3 Released)
 
 ---
 
 ## 📦 Release Log
+
+### v1.2.3 (21 January 2026)
+**Features & Fixes:**
+- ✅ **Multi-Session OAuth Switching**: Full support for switching between Google Drive, Dropbox, OneDrive tabs
+  - Reconnects OAuth provider with correct credentials when switching tabs
+  - Disconnects previous provider before connecting new one
+- ✅ **StatusBar OAuth Fix**: Shows provider name (Google Drive, Dropbox, OneDrive) instead of undefined
+- ✅ **File Operations for OAuth**: mkdir, delete, rename now use provider_* commands for OAuth providers
+- ✅ **Backend Multi-Session Architecture**: Created `session_manager.rs` and `session_commands.rs`
+  - `MultiProviderState` with HashMap<session_id, provider>
+  - Session lifecycle commands: connect, disconnect, switch, list
+- ✅ **useSession Hook**: New React hook for multi-session management
+
+### v1.2.2 (20 January 2026)
+**Features & Fixes:**
+- ✅ **Share Link for OAuth Providers**: Native share link creation for Google Drive, Dropbox, and OneDrive
+  - Google Drive: Creates "anyone with link can view" permission and gets webViewLink
+  - Dropbox: Uses sharing/create_shared_link_with_settings API
+  - OneDrive: Uses Graph API createLink with anonymous scope
+- ✅ **Share Link for AeroCloud**: Context menu option when `public_url_base` is configured
+- ✅ OAuth Folder Download: Added `provider_download_folder` command for recursive folder downloads
+- ✅ FTP After OAuth: Fixed issue where FTP connection failed after OAuth - now disconnects OAuth provider first
+- ✅ OAuth Callback Page: Simplified design, removed emoji, cleaner branding
+- ✅ Tab Switching: All multi-session switching bugs resolved
+
+### v1.2.1 (20 January 2026)
+**Features & Fixes:**
+- ✅ Tab Switching: Fixed remote file list not updating when switching FTP servers
+- ✅ OAuth to FTP Switch: Fixed connection screen not showing
+- ✅ AeroCloud Tab: Fixed protocol parameter for server connections
+- ✅ New Tab Button: Fixed "+" button not showing connection screen
+- ✅ OAuth Callback Page: Professional branded page with animations
+- ✅ AeroCloud Custom Name: Ability to set custom tab name in settings
+- ✅ Translations: Custom cloud name feature in EN, IT, FR, ES, ZH
 
 ### v1.2.0 (20 January 2026)
 **Commit:** `ed0d57f5e924a44e2c9286810344c7b79ce0a9c7`
@@ -24,12 +58,6 @@
   - `cargo-sources.json` → rigenerato (8184 righe)
   - `node-sources.json` → rigenerato (622 sources)
 - ⏳ In attesa review Flathub
-
-### Post-1.2.0 Fixes (Unreleased - v1.2.1)
-- ✅ SavedServers: Disabled unavailable protocols (WebDAV, S3, Dropbox, OneDrive)
-- ✅ SavedServers: Removed AeroCloud (has dedicated panel)
-- ✅ Tab names: Now use custom displayName
-- ✅ README: Updated for v1.2.0 multi-provider
 
 ---
 
@@ -140,12 +168,11 @@ aws-config = "1"
 - [x] OAuth credentials loading from Settings panel
 
 ### Known Limitations
-> ⚠️ **Session Switching Workaround Applied**: v1.2.0 reconnects OAuth on each switch.
-> For optimal experience, test full multi-session backend in Sprint 3.
+> ✅ **Session Switching Fixed in v1.2.3**: Full multi-session OAuth switching now works correctly.
 
-### Remaining Tasks (v1.2.1)
-- [ ] Dropbox API v2 provider implementation
-- [ ] Microsoft Graph API provider (OneDrive)
+### Remaining Tasks
+- [x] Dropbox API v2 provider implementation (v1.2.2)
+- [ ] Microsoft Graph API provider (OneDrive) - partially working
 - [ ] MEGA.nz provider (MEGAcmd REST API)
 - [ ] WebDAV testing (Nextcloud, Synology)
 - [ ] S3 testing (AWS, MinIO, R2)
@@ -158,36 +185,29 @@ aws-config = "1"
 ## 📋 Sprint 3: Multi-Session Architecture & Encryption (v1.3.0)
 
 ### Goals
-- [ ] **Multi-session backend support** (HIGH PRIORITY)
+- [x] **Multi-session backend support** ✅ COMPLETED in v1.2.3
 - [ ] Cryptomator-compatible client-side encryption
 - [ ] Multi-cloud unified view
 - [ ] Cross-cloud file operations
 
-### Multi-Session Architecture (Required)
-Current architecture uses single `ProviderState`:
+### Multi-Session Architecture ✅ IMPLEMENTED
+Implemented `MultiProviderState` in `session_manager.rs`:
 ```rust
-pub struct ProviderState {
-    pub provider: Arc<Mutex<Option<Box<dyn StorageProvider>>>>
-}
-```
-
-**Target architecture** with session-based provider management:
-```rust
-pub struct MultiSessionState {
-    // Map session_id -> provider instance
-    pub providers: Arc<Mutex<HashMap<String, Box<dyn StorageProvider>>>>
+pub struct MultiProviderState {
+    pub sessions: RwLock<HashMap<String, ProviderSession>>,
+    pub active_session_id: RwLock<Option<String>>,
 }
 ```
 
 ### Tasks
-- [ ] Refactor ProviderState to support multiple active sessions
-- [ ] Add session_id parameter to all provider commands
-- [ ] Update frontend to pass session_id with each operation
-- [ ] Implement proper session lifecycle (create, switch, close)
+- [x] Refactor ProviderState to support multiple active sessions
+- [x] Add session_id parameter to all provider commands
+- [x] Update frontend to pass session_id with each operation
+- [x] Implement proper session lifecycle (create, switch, close)
 - [ ] Implement Cryptomator vault format
 - [ ] AES-256-GCM encryption layer
 - [ ] Filename encryption/obfuscation
-- [ ] Multi-tab cloud browser with independent sessions
+- [x] Multi-tab cloud browser with independent sessions
 - [ ] Drag & drop between clouds
 
 ---

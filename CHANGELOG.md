@@ -5,16 +5,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - v1.2.1
+## [1.2.1] - 2025-01-20
 
 ### Fixed
+- **Tab Switching**: Fixed issue where switching between FTP servers didn't update the remote file list
+- **OAuth to FTP Switch**: Fixed issue where switching from OAuth providers (Google Drive, Dropbox, OneDrive) to a new FTP connection didn't show the connection screen
+- **AeroCloud Tab**: Fixed protocol parameter not being passed when connecting to AeroCloud server, which caused issues when switching from OAuth providers
+- **New Tab Button**: Fixed "+" button not showing connection screen when opening a new tab
+
+### Improved
+- **OAuth Callback Page**: Added professional branded callback page with official AeroFTP logo, animations, and modern glassmorphism design
+- **AeroCloud Custom Name**: Added ability to set a custom display name for the AeroCloud tab in settings
+
+### Added
+- Translations for custom cloud name feature in all supported languages (EN, IT, FR, ES, ZH)
+
+---
+
+## [1.2.2] - 2025-01-20
+
+### Added
+- **Share Link for OAuth Providers**: Native share link creation for Google Drive, Dropbox, and OneDrive files
+  - Right-click → "Create Share Link" to generate public sharing URL
+  - Uses native APIs: Google Drive Permissions API, Dropbox Sharing API, OneDrive Graph API
+  - One-click copy to clipboard with toast notification
+- **Share Link for AeroCloud**: "Copy Share Link" in context menu for files in AeroCloud folder (requires `public_url_base` config)
+- **`provider_create_share_link` command**: New Tauri command for creating share links via OAuth providers
+
+### Fixed
+- **OAuth Folder Download**: Added `provider_download_folder` command to properly download folders recursively from Google Drive, Dropbox, and OneDrive
+- **FTP After OAuth**: Fixed issue where connecting to FTP server after using OAuth provider would fail - now properly disconnects OAuth provider before FTP connection
 - **SavedServers Protocol Dropdown**: Disabled unavailable protocols (WebDAV, S3, Dropbox, OneDrive) with "(Soon)" label
 - **AeroCloud in SavedServers**: Removed AeroCloud from SavedServers dropdown - it has dedicated panel via Quick Connect
 - **Tab Display Names**: Sessions now use custom `displayName` instead of raw FTP host
 - **OAuth Tab Names**: OAuth providers show custom name or provider name in tab
 
+### Improved
+- **OAuth Callback Page**: Simplified design, removed emoji icon, cleaner branding
+
 ### Changed
 - **ConnectionParams**: Added `displayName` field for custom session naming
+
+---
+
+## [1.2.3] - 2026-01-21
+
+### 🔄 Multi-Session OAuth Switching
+
+Full support for switching between multiple cloud provider tabs without losing connection state.
+
+### Added
+- **Multi-Session Backend Architecture**: New `session_manager.rs` and `session_commands.rs`
+  - `MultiProviderState` with HashMap<session_id, provider> for concurrent connections
+  - Session lifecycle commands: `session_connect`, `session_disconnect`, `session_switch`, `session_list`
+  - File operation commands with session context: `session_list_files`, `session_mkdir`, `session_delete`, etc.
+- **useSession Hook**: New React hook (`useSession.ts`) for multi-session provider management
+
+### Fixed
+- **OAuth Tab Switching**: Switching between Google Drive, Dropbox, and OneDrive tabs now works correctly
+  - Reconnects OAuth provider with correct credentials from localStorage
+  - Properly disconnects previous provider before connecting new one
+- **StatusBar OAuth Display**: Shows "Google Drive", "Dropbox", "OneDrive" instead of `undefined@undefined`
+- **OAuth File Operations**: mkdir, delete, rename now correctly use `provider_*` commands for OAuth providers
+  - `createFolder` uses `provider_mkdir` for OAuth
+  - `deleteRemoteFile` uses `provider_delete_file/dir` for OAuth  
+  - `renameFile` uses `provider_rename` for OAuth
+
+### Technical
+- Added `MultiProviderState` to Tauri managed state
+- Registered 14 new session_* commands in invoke_handler
+- Added `isCurrentOAuthProvider` memo in App.tsx for provider detection
 
 ---
 

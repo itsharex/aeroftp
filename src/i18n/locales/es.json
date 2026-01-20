@@ -209,6 +209,7 @@
             "hoursAgo": "Hace {count}h",
             "cloudName": "Nombre del Cloud",
             "cloudNamePlaceholder": "Mi Cloud",
+            "cloudNameDesc": "Nombre personalizado mostrado en la pestaña",
             "selectServer": "Selecciona un servidor guardado...",
             "syncOnChange": "Sincronizar al cambiar (tiempo real)",
             "stepFolder": "Elegir Carpeta",

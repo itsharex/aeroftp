@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.2.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.2.2-blue" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green" alt="Platform">
   <img src="https://img.shields.io/badge/Built%20with-Tauri%202.0%20%2B%20React%2018-purple" alt="Built with">
   <img src="https://img.shields.io/badge/License-GPL--3.0-orange" alt="License">
@@ -38,16 +38,24 @@
 | **Async Transfers** | Non-blocking with progress tracking |
 | **Folder Recursion** | Full recursive upload/download/delete |
 
-### ☁️ Multi-Provider Support (NEW in 1.2.0)
+### ☁️ Multi-Provider Support (v1.2.2)
 | Provider | Status | Features |
 |----------|--------|----------|
 | **FTP/FTPS** | ✅ Full | Browse, upload, download, sync |
 | **SFTP** | ✅ Full | SSH-based secure transfers |
-| **Google Drive** | ✅ Full | OAuth2, browse, upload, download |
+| **Google Drive** | ✅ Full | OAuth2, browse, upload, download, **share links** |
+| **Dropbox** | ✅ Full | OAuth2, browse, upload, download, **share links** |
+| **OneDrive** | ✅ Full | OAuth2, browse, upload, download, **share links** |
 | **WebDAV** | 🔄 Beta | Nextcloud, ownCloud compatible |
 | **S3** | 🔄 Beta | AWS, MinIO, Backblaze B2, R2 |
-| **Dropbox** | 📋 Planned | Coming in v1.3.0 |
-| **OneDrive** | 📋 Planned | Coming in v1.3.0 |
+
+### 🔗 Share Links (NEW in v1.2.2)
+| Provider | How It Works |
+|----------|-------------|
+| **Google Drive** | Creates "anyone with link can view" permission |
+| **Dropbox** | Uses native Sharing API |
+| **OneDrive** | Creates anonymous sharing link |
+| **AeroCloud** | Uses configured `public_url_base` |
 
 ### 🔗 Navigation Sync (NEW in 0.9.9)
 - **Per-session sync** - Each tab maintains its own sync state

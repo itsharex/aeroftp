@@ -145,11 +145,10 @@ const PROTOCOLS: ProtocolInfo[] = [
         icon: <DropboxLogo size={18} />,
         description: 'Connect with Dropbox Account',
         defaultPort: 443,
-        badge: 'Soon',
+        badge: 'OAuth',
         isOAuth: true,
         isCloudStorage: true,
-        tooltip: 'Dropbox - Coming in v1.2.1',
-        disabled: true,
+        tooltip: 'Dropbox - 2GB free storage, OAuth2 authentication',
     },
     {
         type: 'onedrive',
@@ -157,11 +156,10 @@ const PROTOCOLS: ProtocolInfo[] = [
         icon: <OneDriveLogo size={18} />,
         description: 'Connect with Microsoft Account',
         defaultPort: 443,
-        badge: 'Soon',
+        badge: 'OAuth',
         isOAuth: true,
         isCloudStorage: true,
-        tooltip: 'Microsoft OneDrive - Coming in v1.2.1',
-        disabled: true,
+        tooltip: 'Microsoft OneDrive - 5GB free storage, OAuth2 authentication',
     },
 ];
 

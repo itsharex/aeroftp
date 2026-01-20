@@ -4,10 +4,10 @@
 //! Uses OAuth2 for authentication.
 
 use async_trait::async_trait;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use serde::{Deserialize, Serialize};
+use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use serde::Deserialize;
 use std::collections::HashMap;
-use tracing::{info, warn, debug};
+use tracing::info;
 
 use super::{
     StorageProvider, ProviderType, ProviderError, RemoteEntry, ProviderConfig,
@@ -648,5 +648,68 @@ impl StorageProvider for OneDriveProvider {
 
     async fn server_info(&mut self) -> Result<String, ProviderError> {
         Ok("Microsoft OneDrive (Graph API v1.0)".to_string())
+    }
+
+    fn supports_share_links(&self) -> bool {
+        true
+    }
+
+    async fn create_share_link(
+        &mut self,
+        path: &str,
+        _expires_in_secs: Option<u64>,
+    ) -> Result<String, ProviderError> {
+        let full_path = if path.starts_with('/') {
+            path.to_string()
+        } else {
+            format!("{}/{}", self.current_path.trim_end_matches('/'), path)
+        };
+
+        // Resolve path to item ID
+        let item_id = self.resolve_path(&full_path).await?;
+
+        // Create a sharing link using Graph API
+        // POST /me/drive/items/{item-id}/createLink
+        let url = format!("{}/createLink", self.api_item(&item_id));
+        
+        let body = serde_json::json!({
+            "type": "view",
+            "scope": "anonymous"
+        });
+
+        let response = self.client
+            .post(&url)
+            .header(AUTHORIZATION, self.auth_header().await?)
+            .header(CONTENT_TYPE, "application/json")
+            .body(body.to_string())
+            .send()
+            .await
+            .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+        let status = response.status();
+        
+        if !status.is_success() {
+            let text = response.text().await.unwrap_or_default();
+            return Err(ProviderError::Other(format!("Failed to create share link: {} - {}", status, text)));
+        }
+
+        #[derive(Deserialize)]
+        struct Link {
+            #[serde(rename = "webUrl")]
+            web_url: Option<String>,
+        }
+        #[derive(Deserialize)]
+        struct CreateLinkResponse {
+            link: Link,
+        }
+
+        let result: CreateLinkResponse = response.json().await
+            .map_err(|e| ProviderError::Other(format!("Failed to parse response: {}", e)))?;
+
+        let url = result.link.web_url
+            .ok_or_else(|| ProviderError::Other("No share URL in response".to_string()))?;
+
+        info!("Created share link for {}: {}", path, url);
+        Ok(url)
     }
 }

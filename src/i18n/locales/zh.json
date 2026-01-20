@@ -209,6 +209,7 @@
             "hoursAgo": "{count}小时前",
             "cloudName": "云名称",
             "cloudNamePlaceholder": "我的云",
+            "cloudNameDesc": "标签页显示的自定义名称",
             "selectServer": "选择已保存的服务器...",
             "syncOnChange": "文件变更时同步（实时）",
             "stepFolder": "选择文件夹",

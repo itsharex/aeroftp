@@ -4,10 +4,10 @@
 //! Uses OAuth2 for authentication.
 
 use async_trait::async_trait;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use serde::{Deserialize, Serialize};
+use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use serde::Deserialize;
 use std::collections::HashMap;
-use tracing::{info, warn, debug};
+use tracing::info;
 
 use super::{
     StorageProvider, ProviderType, ProviderError, RemoteEntry, ProviderConfig,
@@ -675,5 +675,85 @@ impl StorageProvider for GoogleDriveProvider {
 
     async fn server_info(&mut self) -> Result<String, ProviderError> {
         Ok("Google Drive API v3".to_string())
+    }
+
+    fn supports_share_links(&self) -> bool {
+        true
+    }
+
+    async fn create_share_link(
+        &mut self,
+        path: &str,
+        _expires_in_secs: Option<u64>,
+    ) -> Result<String, ProviderError> {
+        // Resolve path to file ID
+        let path = path.trim_matches('/');
+        let (parent_path, file_name) = if let Some(pos) = path.rfind('/') {
+            (&path[..pos], &path[pos + 1..])
+        } else {
+            ("", path)
+        };
+
+        let parent_id = if parent_path.is_empty() {
+            self.current_folder_id.clone()
+        } else {
+            self.resolve_path(parent_path).await?
+        };
+
+        let file = self.find_by_name(file_name, &parent_id).await?
+            .ok_or_else(|| ProviderError::NotFound(path.to_string()))?;
+
+        // Create "anyone with link can view" permission
+        let permission = serde_json::json!({
+            "role": "reader",
+            "type": "anyone"
+        });
+
+        let perm_url = format!("{}/files/{}/permissions", DRIVE_API_BASE, file.id);
+        
+        let response = self.client
+            .post(&perm_url)
+            .header(AUTHORIZATION, self.auth_header().await?)
+            .header(CONTENT_TYPE, "application/json")
+            .body(permission.to_string())
+            .send()
+            .await
+            .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(ProviderError::Other(format!("Failed to create share permission: {} - {}", status, text)));
+        }
+
+        // Get the web view link
+        let file_url = format!("{}/files/{}?fields=webViewLink", DRIVE_API_BASE, file.id);
+        
+        let response = self.client
+            .get(&file_url)
+            .header(AUTHORIZATION, self.auth_header().await?)
+            .send()
+            .await
+            .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+        if !response.status().is_success() {
+            // Fallback to direct link
+            return Ok(format!("https://drive.google.com/file/d/{}/view?usp=sharing", file.id));
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct FileLink {
+            web_view_link: Option<String>,
+        }
+
+        let link_response: FileLink = response.json().await
+            .map_err(|e| ProviderError::Other(format!("Failed to parse response: {}", e)))?;
+
+        let url = link_response.web_view_link
+            .unwrap_or_else(|| format!("https://drive.google.com/file/d/{}/view?usp=sharing", file.id));
+
+        info!("Created share link for {}: {}", path, url);
+        Ok(url)
     }
 }

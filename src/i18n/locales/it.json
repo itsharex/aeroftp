@@ -209,6 +209,7 @@
             "hoursAgo": "{count}h fa",
             "cloudName": "Nome Cloud",
             "cloudNamePlaceholder": "Il Mio Cloud",
+            "cloudNameDesc": "Nome personalizzato visualizzato nella scheda",
             "selectServer": "Seleziona un server salvato...",
             "syncOnChange": "Sincronizza automaticamente (tempo reale)",
             "stepFolder": "Scegli Cartella",

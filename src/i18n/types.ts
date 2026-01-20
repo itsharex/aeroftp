@@ -225,6 +225,7 @@ export interface TranslationKeys {
         hoursAgo: string;
         cloudName: string;
         cloudNamePlaceholder: string;
+        cloudNameDesc: string;
         selectServer: string;
         syncOnChange: string;
         stepFolder: string;

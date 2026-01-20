@@ -4,13 +4,12 @@
 //! the StorageProvider abstraction, enabling support for FTP, WebDAV, S3, etc.
 
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
 use tokio::sync::Mutex;
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 
 use crate::providers::{
-    StorageProvider, ProviderFactory, ProviderError, ProviderType,
+    StorageProvider, ProviderFactory, ProviderType,
     ProviderConfig, RemoteEntry,
 };
 
@@ -325,6 +324,71 @@ pub async fn provider_download_file(
     
     info!("Download completed: {}", filename);
     Ok(format!("Downloaded: {}", filename))
+}
+
+/// Download a folder recursively from the remote server (OAuth providers)
+#[tauri::command]
+pub async fn provider_download_folder(
+    app: AppHandle,
+    state: State<'_, ProviderState>,
+    remote_path: String,
+    local_path: String,
+) -> Result<String, String> {
+    let mut provider_lock = state.provider.lock().await;
+    
+    let provider = provider_lock.as_mut()
+        .ok_or("Not connected to any provider")?;
+    
+    let folder_name = std::path::Path::new(&remote_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "folder".to_string());
+    
+    info!("Downloading folder via provider: {} -> {}", remote_path, local_path);
+    
+    // Create local folder
+    tokio::fs::create_dir_all(&local_path).await
+        .map_err(|e| format!("Failed to create local folder: {}", e))?;
+    
+    // Use a stack-based approach to download recursively
+    let mut folders_to_scan: Vec<(String, String)> = vec![(remote_path.clone(), local_path.clone())];
+    let mut files_downloaded = 0u32;
+    
+    while let Some((remote_folder, local_folder)) = folders_to_scan.pop() {
+        // Change to the remote folder first
+        provider.cd(&remote_folder).await
+            .map_err(|e| format!("Failed to change to folder {}: {}", remote_folder, e))?;
+        
+        // List files in the current folder
+        let files = provider.list(".").await
+            .map_err(|e| format!("Failed to list files in {}: {}", remote_folder, e))?;
+        
+        for file in files {
+            let remote_file_path = if remote_folder.ends_with('/') {
+                format!("{}{}", remote_folder, file.name)
+            } else {
+                format!("{}/{}", remote_folder, file.name)
+            };
+            let local_file_path = format!("{}/{}", local_folder, file.name);
+            
+            if file.is_dir {
+                // Create local subfolder and add to scan queue
+                tokio::fs::create_dir_all(&local_file_path).await
+                    .map_err(|e| format!("Failed to create folder {}: {}", local_file_path, e))?;
+                folders_to_scan.push((remote_file_path, local_file_path));
+            } else {
+                // Download file
+                if let Err(e) = provider.download(&remote_file_path, &local_file_path, None).await {
+                    warn!("Failed to download {}: {}", remote_file_path, e);
+                } else {
+                    files_downloaded += 1;
+                }
+            }
+        }
+    }
+    
+    info!("Folder download completed: {} ({} files)", folder_name, files_downloaded);
+    Ok(format!("Downloaded folder: {} ({} files)", folder_name, files_downloaded))
 }
 
 /// Upload a file to the remote server
@@ -755,4 +819,29 @@ pub async fn oauth2_logout(
     
     info!("Logged out from {}", provider);
     Ok(())
+}
+
+/// Create a shareable link for a file using the OAuth provider's native sharing API
+/// Works with Google Drive, Dropbox, and OneDrive
+#[tauri::command]
+pub async fn provider_create_share_link(
+    state: State<'_, ProviderState>,
+    path: String,
+) -> Result<String, String> {
+    let mut provider_guard = state.provider.lock().await;
+    let provider = provider_guard.as_mut()
+        .ok_or_else(|| "Not connected to any provider".to_string())?;
+    
+    if !provider.supports_share_links() {
+        return Err(format!(
+            "{} does not support native share links", 
+            provider.provider_type()
+        ));
+    }
+    
+    let share_url = provider.create_share_link(&path, None).await
+        .map_err(|e| format!("Failed to create share link: {}", e))?;
+    
+    info!("Created share link for {}: {}", path, share_url);
+    Ok(share_url)
 }

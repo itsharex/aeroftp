@@ -42,7 +42,7 @@ import {
   Download, Upload, Pencil, Trash2, X, ArrowUp, ArrowDown,
   Folder, FileText, Globe, HardDrive, Settings, Search, Eye, Link2, Unlink, PanelTop, Shield, Cloud,
   Archive, Image, Video, FileCode, Music, File, FileSpreadsheet, FileType, Code, Database, Clock,
-  Copy, Clipboard, ExternalLink, List, LayoutGrid, ChevronRight, Plus, CheckCircle2, AlertTriangle
+  Copy, Clipboard, ExternalLink, List, LayoutGrid, ChevronRight, Plus, CheckCircle2, AlertTriangle, Share2
 } from 'lucide-react';
 
 // Extracted utilities and components (Phase 1 modularization)
@@ -100,6 +100,7 @@ const App: React.FC = () => {
   const [cloudLastSync, setCloudLastSync] = useState<string | null>(null);  // Last sync timestamp for badges
   const [cloudLocalFolder, setCloudLocalFolder] = useState<string>('');  // Cloud local folder path
   const [cloudRemoteFolder, setCloudRemoteFolder] = useState<string>('');  // Cloud remote folder path
+  const [cloudPublicUrlBase, setCloudPublicUrlBase] = useState<string>('');  // Public URL base for share links
   const [showConnectionScreen, setShowConnectionScreen] = useState(true);  // Initial connection screen, can be skipped
   const [showMenuBar, setShowMenuBar] = useState(true);  // Internal header visibility (with logo and theme toggle)
   const [systemMenuVisible, setSystemMenuVisible] = useState(false);  // Native system menu bar (File, Edit, View, Help) - hidden by default
@@ -215,6 +216,12 @@ const App: React.FC = () => {
     // Default: assume coherent if we can't determine otherwise
     return true;
   }, [isConnected, connectionParams.server, currentLocalPath]);
+
+  // Helper: Check if current connection is an OAuth provider
+  const isCurrentOAuthProvider = React.useMemo(() => {
+    const protocol = connectionParams.protocol;
+    return protocol && ['googledrive', 'dropbox', 'onedrive'].includes(protocol);
+  }, [connectionParams.protocol]);
 
   // Load image preview as base64 when file changes
   useEffect(() => {
@@ -676,13 +683,18 @@ const App: React.FC = () => {
       try {
         const config = await invoke<{
           enabled: boolean;
+          cloud_name?: string;
           server_profile?: string;
           last_sync?: string;
           local_folder?: string;
           remote_folder?: string;
+          public_url_base?: string | null;
         }>('get_cloud_config');
         setIsCloudActive(config.enabled);
-        if (config.server_profile) {
+        // Use custom cloud_name if set, otherwise fall back to server_profile
+        if (config.cloud_name) {
+          setCloudServerName(config.cloud_name);
+        } else if (config.server_profile) {
           setCloudServerName(config.server_profile);
         }
         if (config.last_sync) {
@@ -693,6 +705,9 @@ const App: React.FC = () => {
         }
         if (config.remote_folder) {
           setCloudRemoteFolder(config.remote_folder);
+        }
+        if (config.public_url_base) {
+          setCloudPublicUrlBase(config.public_url_base);
         }
 
         // Auto-start background sync if cloud is enabled
@@ -833,6 +848,12 @@ const App: React.FC = () => {
     setSyncBasePaths(null);
     const logId = humanLog.logStart('CONNECT', { server: connectionParams.server });
     try {
+      // First disconnect any active OAuth provider to avoid conflicts
+      try {
+        await invoke('provider_disconnect');
+      } catch {
+        // Ignore if not connected to OAuth
+      }
       await invoke('connect_ftp', { params: connectionParams });
       setIsConnected(true);
       humanLog.logSuccess('CONNECT', { server: connectionParams.server }, logId);
@@ -944,17 +965,73 @@ const App: React.FC = () => {
     setIsSyncNavigation(targetSession.isSyncNavigation ?? false);
     setSyncBasePaths(targetSession.syncBasePaths ?? null);
 
+    // Determine if this is an OAuth provider session
+    const protocol = targetSession.connectionParams?.protocol;
+    const isOAuth = protocol && ['googledrive', 'dropbox', 'onedrive'].includes(protocol);
+
     // Reconnect to the new server and refresh data
     setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connecting' } : s));
     humanLog.log('CONNECT', `🔄 Reconnecting to ${targetSession.serverName}...`, 'running');
+    
     try {
-      await invoke('connect_ftp', { params: targetSession.connectionParams });
-      await invoke('change_directory', { path: targetSession.remotePath });
+      let response: FileListResponse;
+      
+      if (isOAuth) {
+        // OAuth providers - need to reconnect because ProviderState may have a different provider
+        console.log('[switchSession] OAuth provider, reconnecting...');
+        
+        // First disconnect any existing provider to avoid conflicts
+        try {
+          await invoke('provider_disconnect');
+        } catch {
+          // Ignore if not connected
+        }
+        try {
+          await invoke('disconnect_ftp');
+        } catch {
+          // Ignore if not connected
+        }
+        
+        // Get OAuth credentials from localStorage
+        const clientId = localStorage.getItem(`oauth_${protocol}_client_id`);
+        const clientSecret = localStorage.getItem(`oauth_${protocol}_client_secret`);
+        
+        if (!clientId || !clientSecret) {
+          throw new Error(`OAuth credentials not found for ${protocol}`);
+        }
+        
+        // Map protocol to OAuth provider name
+        const oauthProvider = protocol === 'googledrive' ? 'google_drive' : protocol;
+        
+        // Reconnect to the OAuth provider
+        await invoke('oauth2_connect', {
+          params: {
+            provider: oauthProvider,
+            client_id: clientId,
+            client_secret: clientSecret,
+          }
+        });
+        
+        // Now navigate to the session's path
+        response = await invoke('provider_change_dir', { path: targetSession.remotePath || '/' });
+      } else {
+        // FTP/FTPS - reconnect and navigate
+        console.log('[switchSession] FTP provider, reconnecting...');
+        // First disconnect any active OAuth provider to avoid conflicts
+        try {
+          await invoke('provider_disconnect');
+        } catch {
+          // Ignore if not connected to OAuth
+        }
+        await invoke('connect_ftp', { params: targetSession.connectionParams });
+        await invoke('change_directory', { path: targetSession.remotePath });
+        response = await invoke('list_files');
+      }
+      
       setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'connected' } : s));
       humanLog.log('CONNECT', `✅ Reconnected to ${targetSession.serverName}`, 'success');
       
-      // Refresh BOTH remote and local files with real data
-      const response: FileListResponse = await invoke('list_files');
+      // Refresh remote files with real data
       setRemoteFiles(response.files);
       setCurrentRemotePath(response.current_path);
       
@@ -1012,10 +1089,14 @@ const App: React.FC = () => {
           : s
       ));
     }
+    // Deselect the active session since we're going to connection screen
+    setActiveSessionId(null);
     // Reset sync state for new connection
     setIsSyncNavigation(false);
     setSyncBasePaths(null);
     setIsConnected(false);
+    // Show the connection screen for selecting a new server
+    setShowConnectionScreen(true);
   };
 
   // Handle click on Cloud Tab - auto-connect to cloud server profile
@@ -1038,9 +1119,37 @@ const App: React.FC = () => {
         return;
       }
 
-      // If already connected, just trigger sync and navigate to cloud folders
+      // Get saved servers from localStorage (needed to check if same server)
+      const savedServersStr = localStorage.getItem('aeroftp-saved-servers');
+      if (!savedServersStr) {
+        notify.error('No saved servers', 'Please save your server first');
+        setShowCloudPanel(true);
+        return;
+      }
+
+      const savedServers = JSON.parse(savedServersStr);
+      const cloudServer = savedServers.find((s: { name: string }) => s.name === cloudConfig.server_profile);
+
+      if (!cloudServer) {
+        notify.error('Server not found', `Server profile "${cloudConfig.server_profile}" not found`);
+        setShowCloudPanel(true);
+        return;
+      }
+
+      // Build connection params for cloud server
+      const cloudServerString = cloudServer.port && cloudServer.port !== 21
+        ? `${cloudServer.host}:${cloudServer.port}`
+        : cloudServer.host;
+
+      // If already connected, check if it's the same server
       if (isConnected) {
-        console.log('Already connected, just syncing and navigating...');
+        console.log('Already connected, checking if same server...');
+        
+        // Compare current connection with cloud server
+        const currentServer = connectionParams.server;
+        const isSameServer = currentServer === cloudServerString;
+        
+        console.log(`Current server: ${currentServer}, Cloud server: ${cloudServerString}, Same: ${isSameServer}`);
 
         // IMPORTANT: Save current session state before navigating to cloud
         // Capture current state values for the closure
@@ -1049,13 +1158,59 @@ const App: React.FC = () => {
         const capturedRemotePath = currentRemotePath;
         const capturedLocalPath = currentLocalPath;
         const capturedSessionId = activeSessionId;
+        const capturedSyncNav = isSyncNavigation;
+        const capturedSyncPaths = syncBasePaths;
 
         if (capturedSessionId) {
           setSessions(prev => prev.map(s =>
             s.id === capturedSessionId
-              ? { ...s, remoteFiles: [...capturedRemoteFiles], localFiles: [...capturedLocalFiles], remotePath: capturedRemotePath, localPath: capturedLocalPath }
+              ? { 
+                  ...s, 
+                  status: 'cached',  // Mark as cached since we're switching away
+                  remoteFiles: [...capturedRemoteFiles], 
+                  localFiles: [...capturedLocalFiles], 
+                  remotePath: capturedRemotePath, 
+                  localPath: capturedLocalPath,
+                  isSyncNavigation: capturedSyncNav,
+                  syncBasePaths: capturedSyncPaths
+                }
               : s
           ));
+        }
+        
+        // Deselect current session tab since we're going to AeroCloud
+        setActiveSessionId(null);
+
+        // If different server, we need to reconnect to the cloud server
+        if (!isSameServer) {
+          console.log('Different server, reconnecting to cloud server...');
+          const params = {
+            server: cloudServerString,
+            username: cloudServer.username || '',
+            password: cloudServer.password || '',
+            protocol: cloudServer.protocol || 'ftp',  // Include protocol from saved server
+          };
+
+          try {
+            setLoading(true);
+            await invoke('connect_ftp', { params });
+            setConnectionParams(params);
+            humanLog.log('CONNECT', `🔄 Switched to AeroCloud server: ${cloudConfig.server_profile}`, 'success');
+          } catch (connError) {
+            console.log('Failed to connect to cloud server:', connError);
+            notify.error('Connection Failed', `Failed to connect to cloud server: ${connError}`);
+            // Restore previous session
+            if (capturedSessionId) {
+              setActiveSessionId(capturedSessionId);
+              setSessions(prev => prev.map(s =>
+                s.id === capturedSessionId ? { ...s, status: 'connected' } : s
+              ));
+            }
+            setLoading(false);
+            return;
+          } finally {
+            setLoading(false);
+          }
         }
 
         // Navigate to cloud folders
@@ -1084,32 +1239,12 @@ const App: React.FC = () => {
         return;
       }
 
-      // Get saved servers from localStorage
-      const savedServersStr = localStorage.getItem('aeroftp-saved-servers');
-      if (!savedServersStr) {
-        notify.error('No saved servers', 'Please save your server first');
-        setShowCloudPanel(true);
-        return;
-      }
-
-      const savedServers = JSON.parse(savedServersStr);
-      const cloudServer = savedServers.find((s: { name: string }) => s.name === cloudConfig.server_profile);
-
-      if (!cloudServer) {
-        notify.error('Server not found', `Server profile "${cloudConfig.server_profile}" not found`);
-        setShowCloudPanel(true);
-        return;
-      }
-
-      // Build connection params
-      const serverString = cloudServer.port && cloudServer.port !== 21
-        ? `${cloudServer.host}:${cloudServer.port}`
-        : cloudServer.host;
-
+      // Not connected yet - connect to cloud server
       const params = {
-        server: serverString,
+        server: cloudServerString,
         username: cloudServer.username || '',
         password: cloudServer.password || '',
+        protocol: cloudServer.protocol || 'ftp',  // Include protocol from saved server
       };
 
       // Connect
@@ -1150,7 +1285,6 @@ const App: React.FC = () => {
       setLoading(false);
     }
   };
-
   const changeRemoteDirectory = async (path: string, overrideProtocol?: string) => {
     try {
       // Check if we're connected to an OAuth provider
@@ -1263,13 +1397,24 @@ const App: React.FC = () => {
   const downloadFile = async (remoteFilePath: string, fileName: string, destinationPath?: string, isDir: boolean = false, fileSize?: number) => {
     const logId = humanLog.logStart('DOWNLOAD', { filename: fileName });
     const startTime = Date.now();
+    
+    // Check if we're using an OAuth provider
+    const protocol = connectionParams.protocol;
+    const isOAuth = protocol && ['googledrive', 'dropbox', 'onedrive'].includes(protocol);
+    
     try {
       if (isDir) {
         const downloadPath = destinationPath || await open({ directory: true, multiple: false, defaultPath: await downloadDir() });
         if (downloadPath) {
           const folderPath = `${downloadPath}/${fileName}`;
-          const params: DownloadFolderParams = { remote_path: remoteFilePath, local_path: folderPath };
-          await invoke('download_folder', { params });
+          if (isOAuth) {
+            // Use OAuth provider command for folder download
+            await invoke('provider_download_folder', { remotePath: remoteFilePath, localPath: folderPath });
+          } else {
+            // Use FTP command
+            const params: DownloadFolderParams = { remote_path: remoteFilePath, local_path: folderPath };
+            await invoke('download_folder', { params });
+          }
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
           humanLog.log('DOWNLOAD', `📥 Downloaded folder ${fileName} in ${elapsed}s`, 'success');
           humanLog.updateEntry(logId, { status: 'success', message: `📥 Downloaded folder ${fileName} in ${elapsed}s` });
@@ -1279,8 +1424,15 @@ const App: React.FC = () => {
       } else {
         const downloadPath = destinationPath || await open({ directory: true, multiple: false, defaultPath: await downloadDir() });
         if (downloadPath) {
-          const params: DownloadParams = { remote_path: remoteFilePath, local_path: `${downloadPath}/${fileName}` };
-          await invoke('download_file', { params });
+          const localFilePath = `${downloadPath}/${fileName}`;
+          if (isOAuth) {
+            // Use OAuth provider command for file download
+            await invoke('provider_download_file', { remotePath: remoteFilePath, localPath: localFilePath });
+          } else {
+            // Use FTP command
+            const params: DownloadParams = { remote_path: remoteFilePath, local_path: localFilePath };
+            await invoke('download_file', { params });
+          }
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
           const sizeStr = fileSize ? formatBytes(fileSize) : '';
           const msg = sizeStr 
@@ -1581,8 +1733,17 @@ const App: React.FC = () => {
         for (const name of names) {
           const file = remoteFiles.find(f => f.name === name);
           if (file) {
-            try { 
-              await invoke('delete_remote_file', { path: file.path, isDir: file.is_dir }); 
+            try {
+              // Use provider commands for OAuth providers
+              if (isCurrentOAuthProvider) {
+                if (file.is_dir) {
+                  await invoke('provider_delete_dir', { path: file.path, recursive: true });
+                } else {
+                  await invoke('provider_delete_file', { path: file.path });
+                }
+              } else {
+                await invoke('delete_remote_file', { path: file.path, isDir: file.is_dir });
+              }
               if (file.is_dir) {
                 deletedFolders.push(name);
               } else {
@@ -1652,7 +1813,16 @@ const App: React.FC = () => {
         setConfirmDialog(null);
         const logId = humanLog.logStart('DELETE', { filename: fileName });
         try {
-          await invoke('delete_remote_file', { path, isDir });
+          // Use provider commands for OAuth providers
+          if (isCurrentOAuthProvider) {
+            if (isDir) {
+              await invoke('provider_delete_dir', { path, recursive: true });
+            } else {
+              await invoke('provider_delete_file', { path });
+            }
+          } else {
+            await invoke('delete_remote_file', { path, isDir });
+          }
           humanLog.logSuccess('DELETE', { filename: fileName }, logId);
           notify.success('Deleted', fileName);
           await loadRemoteFiles();
@@ -1700,7 +1870,12 @@ const App: React.FC = () => {
           const newPath = parentDir + '/' + newName;
 
           if (isRemote) {
-            await invoke('rename_remote_file', { from: path, to: newPath });
+            // Use provider commands for OAuth providers
+            if (isCurrentOAuthProvider) {
+              await invoke('provider_rename', { from: path, to: newPath });
+            } else {
+              await invoke('rename_remote_file', { from: path, to: newPath });
+            }
             await loadRemoteFiles();
           } else {
             await invoke('rename_local_file', { from: path, to: newPath });
@@ -1727,7 +1902,14 @@ const App: React.FC = () => {
         try {
           if (isRemote) {
             const path = currentRemotePath + (currentRemotePath.endsWith('/') ? '' : '/') + name;
-            await invoke('create_remote_folder', { path });
+            // Use provider_mkdir for OAuth providers, create_remote_folder for FTP
+            const protocol = connectionParams.protocol;
+            const isOAuth = protocol && ['googledrive', 'dropbox', 'onedrive'].includes(protocol);
+            if (isOAuth) {
+              await invoke('provider_mkdir', { path });
+            } else {
+              await invoke('create_remote_folder', { path });
+            }
             await loadRemoteFiles();
           } else {
             // Create local folder
@@ -1778,6 +1960,44 @@ const App: React.FC = () => {
         }
       },
     ];
+
+    // Add Share Link option if AeroCloud is active with public_url_base configured
+    // and the file is within the AeroCloud remote folder
+    if (isCloudActive && cloudPublicUrlBase && cloudRemoteFolder && file.path.startsWith(cloudRemoteFolder)) {
+      items.push({
+        label: 'Copy Share Link',
+        icon: <Share2 size={14} />,
+        action: async () => {
+          try {
+            const shareUrl = await invoke<string>('generate_share_link_remote', { remotePath: file.path });
+            await navigator.clipboard.writeText(shareUrl);
+            notify.success('Share link copied!', shareUrl);
+          } catch (err) {
+            notify.error('Failed to generate share link', String(err));
+          }
+        }
+      });
+    }
+
+    // Add native Share Link for OAuth providers (Google Drive, Dropbox, OneDrive)
+    const isOAuthProvider = connectionParams.protocol && ['googledrive', 'dropbox', 'onedrive'].includes(connectionParams.protocol);
+    if (isOAuthProvider && !file.is_dir) {
+      items.push({
+        label: 'Create Share Link',
+        icon: <Share2 size={14} />,
+        action: async () => {
+          try {
+            notify.info('Creating share link...', 'This may take a moment');
+            const shareUrl = await invoke<string>('provider_create_share_link', { path: file.path });
+            await navigator.clipboard.writeText(shareUrl);
+            notify.success('Share link copied!', shareUrl);
+          } catch (err) {
+            notify.error('Failed to create share link', String(err));
+          }
+        }
+      });
+    }
+
     contextMenu.show(e, items);
   };
 
@@ -1812,6 +2032,25 @@ const App: React.FC = () => {
       { label: 'Copy Name', icon: <Clipboard size={14} />, action: () => { navigator.clipboard.writeText(file.name); notify.success('Name copied'); }, divider: true },
       { label: 'Open in File Manager', icon: <ExternalLink size={14} />, action: () => openInFileManager(file.is_dir ? file.path : currentLocalPath) },
     ];
+
+    // Add Share Link option if AeroCloud is active with public_url_base configured
+    // and the file is within the AeroCloud local folder
+    if (isCloudActive && cloudPublicUrlBase && cloudLocalFolder && file.path.startsWith(cloudLocalFolder)) {
+      items.push({
+        label: 'Copy Share Link',
+        icon: <Share2 size={14} />,
+        action: async () => {
+          try {
+            const shareUrl = await invoke<string>('generate_share_link', { localPath: file.path });
+            await navigator.clipboard.writeText(shareUrl);
+            notify.success('Share link copied!', shareUrl);
+          } catch (err) {
+            notify.error('Failed to generate share link', String(err));
+          }
+        }
+      });
+    }
+
     contextMenu.show(e, items);
   };
 
@@ -2642,7 +2881,14 @@ const App: React.FC = () => {
 
       <StatusBar
         isConnected={isConnected}
-        serverInfo={isConnected ? `${connectionParams.username}@${connectionParams.server}` : undefined}
+        serverInfo={isConnected ? (() => {
+          const protocol = connectionParams.protocol;
+          if (protocol === 'googledrive') return 'Google Drive';
+          if (protocol === 'dropbox') return 'Dropbox';
+          if (protocol === 'onedrive') return 'OneDrive';
+          // For FTP/FTPS/SFTP/etc, show username@server
+          return connectionParams.server ? `${connectionParams.username}@${connectionParams.server}` : undefined;
+        })() : undefined}
         remotePath={currentRemotePath}
         localPath={currentLocalPath}
         remoteFileCount={remoteFiles.length}

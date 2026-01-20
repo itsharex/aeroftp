@@ -4,10 +4,10 @@
 //! Uses OAuth2 for authentication.
 
 use async_trait::async_trait;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use serde::{Deserialize, Serialize};
+use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use serde::Deserialize;
 use std::collections::HashMap;
-use tracing::{info, warn, debug};
+use tracing::info;
 
 use super::{
     StorageProvider, ProviderType, ProviderError, RemoteEntry, ProviderConfig,
@@ -515,5 +515,105 @@ impl StorageProvider for DropboxProvider {
 
     async fn server_info(&mut self) -> Result<String, ProviderError> {
         Ok("Dropbox API v2".to_string())
+    }
+
+    fn supports_share_links(&self) -> bool {
+        true
+    }
+
+    async fn create_share_link(
+        &mut self,
+        path: &str,
+        _expires_in_secs: Option<u64>,
+    ) -> Result<String, ProviderError> {
+        let full_path = if path.starts_with('/') {
+            self.normalize_path(path)
+        } else {
+            self.normalize_path(&format!("{}/{}", self.current_path, path))
+        };
+
+        // Try to create a shared link
+        let body = serde_json::json!({
+            "path": full_path,
+            "settings": {
+                "access": "viewer",
+                "allow_download": true,
+                "audience": "public",
+                "requested_visibility": "public"
+            }
+        });
+
+        // Dropbox API: sharing/create_shared_link_with_settings
+        let url = format!("{}/sharing/create_shared_link_with_settings", API_BASE);
+        
+        let response = self.client
+            .post(&url)
+            .header(AUTHORIZATION, self.auth_header().await?)
+            .header(CONTENT_TYPE, "application/json")
+            .body(body.to_string())
+            .send()
+            .await
+            .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+
+        // If link already exists, get it instead
+        if status == 409 && text.contains("shared_link_already_exists") {
+            // Get existing link
+            let body = serde_json::json!({
+                "path": full_path,
+                "direct_only": false
+            });
+
+            let url = format!("{}/sharing/list_shared_links", API_BASE);
+            
+            let response = self.client
+                .post(&url)
+                .header(AUTHORIZATION, self.auth_header().await?)
+                .header(CONTENT_TYPE, "application/json")
+                .body(body.to_string())
+                .send()
+                .await
+                .map_err(|e| ProviderError::ConnectionFailed(e.to_string()))?;
+
+            if !response.status().is_success() {
+                return Err(ProviderError::Other("Failed to get existing share link".to_string()));
+            }
+
+            #[derive(Deserialize)]
+            struct SharedLink {
+                url: String,
+            }
+            #[derive(Deserialize)]
+            struct SharedLinksResult {
+                links: Vec<SharedLink>,
+            }
+
+            let result: SharedLinksResult = response.json().await
+                .map_err(|e| ProviderError::Other(format!("Failed to parse response: {}", e)))?;
+
+            if let Some(link) = result.links.first() {
+                info!("Retrieved existing share link for {}: {}", path, link.url);
+                return Ok(link.url.clone());
+            }
+
+            return Err(ProviderError::Other("No existing share link found".to_string()));
+        }
+
+        if !status.is_success() {
+            return Err(ProviderError::Other(format!("Failed to create share link: {} - {}", status, text)));
+        }
+
+        #[derive(Deserialize)]
+        struct CreateLinkResponse {
+            url: String,
+        }
+
+        let result: CreateLinkResponse = serde_json::from_str(&text)
+            .map_err(|e| ProviderError::Other(format!("Failed to parse response: {}", e)))?;
+
+        info!("Created share link for {}: {}", path, result.url);
+        Ok(result.url)
     }
 }

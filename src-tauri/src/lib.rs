@@ -16,6 +16,8 @@ mod watcher;
 mod cloud_service;
 mod providers;
 mod provider_commands;
+mod session_manager;
+mod session_commands;
 #[cfg(unix)]
 mod pty;
 
@@ -2772,7 +2774,8 @@ pub fn run() {
             }
         })
         .manage(AppState::new())
-        .manage(provider_commands::ProviderState::new());
+        .manage(provider_commands::ProviderState::new())
+        .manage(session_manager::MultiProviderState::new());
 
     // Add PTY state only on Unix systems
     #[cfg(unix)]
@@ -2842,6 +2845,7 @@ pub fn run() {
             provider_commands::provider_go_up,
             provider_commands::provider_pwd,
             provider_commands::provider_download_file,
+            provider_commands::provider_download_folder,
             provider_commands::provider_upload_file,
             provider_commands::provider_mkdir,
             provider_commands::provider_delete_file,
@@ -2859,6 +2863,21 @@ pub fn run() {
             provider_commands::oauth2_full_auth,
             provider_commands::oauth2_has_tokens,
             provider_commands::oauth2_logout,
+            provider_commands::provider_create_share_link,
+            // Multi-session provider commands
+            session_commands::session_connect,
+            session_commands::session_disconnect,
+            session_commands::session_switch,
+            session_commands::session_list,
+            session_commands::session_info,
+            session_commands::session_list_files,
+            session_commands::session_change_dir,
+            session_commands::session_mkdir,
+            session_commands::session_delete,
+            session_commands::session_rename,
+            session_commands::session_download,
+            session_commands::session_upload,
+            session_commands::session_create_share_link,
             #[cfg(unix)]
             spawn_shell,
             #[cfg(unix)]

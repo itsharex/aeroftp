@@ -209,6 +209,7 @@
             "hoursAgo": "Il y a {count}h",
             "cloudName": "Nom du Cloud",
             "cloudNamePlaceholder": "Mon Cloud",
+            "cloudNameDesc": "Nom personnalisé affiché dans l'onglet",
             "selectServer": "Sélectionner un serveur enregistré...",
             "syncOnChange": "Synchroniser au changement (temps réel)",
             "stepFolder": "Choisir le Dossier",
