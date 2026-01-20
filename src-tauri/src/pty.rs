@@ -57,6 +57,13 @@ pub fn spawn_shell(app: AppHandle, pty_state: State<'_, PtyState>, cwd: Option<S
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     
+    // Set a colorful PS1 prompt: cyan user@host, blue path, white $
+    // Format: \[\e[1;36m\]user@host\[\e[0m\]:\[\e[1;34m\]path\[\e[0m\]$ 
+    cmd.env("PS1", r"\[\e[1;36m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ ");
+    cmd.env("FORCE_COLOR", "1");
+    cmd.env("CLICOLOR", "1");
+    cmd.env("CLICOLOR_FORCE", "1");
+    
     // Set working directory
     if let Some(path) = cwd {
         cmd.cwd(path);
@@ -116,7 +123,7 @@ pub fn pty_write(pty_state: State<'_, PtyState>, data: String) -> Result<(), Str
         writer
             .write_all(data.as_bytes())
             .map_err(|e| format!("Write error: {}", e))?;
-        // writer.flush().map_err(|e| format!("Flush error: {}", e))?; // Flush might not be needed/supported on all PTYs
+        writer.flush().map_err(|e| format!("Flush error: {}", e))?;
         Ok(())
     } else {
         Err("No active PTY session".to_string())

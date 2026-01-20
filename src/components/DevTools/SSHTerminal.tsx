@@ -7,6 +7,23 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import 'xterm/css/xterm.css';
 
+// Custom terminal styles
+const terminalStyles = `
+.xterm .xterm-cursor-layer {
+    z-index: 10;
+}
+.xterm .xterm-cursor {
+    background-color: #00ff00 !important;
+    opacity: 1 !important;
+}
+.xterm .xterm-cursor-block {
+    background-color: #00ff00 !important;
+}
+.xterm .xterm-cursor-outline {
+    outline: 2px solid #00ff00 !important;
+}
+`;
+
 interface SSHTerminalProps {
     className?: string;
     localPath?: string;
@@ -22,6 +39,18 @@ export const SSHTerminal: React.FC<SSHTerminalProps> = ({
     const [isConnected, setIsConnected] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
     const unlistenRef = useRef<UnlistenFn | null>(null);
+    const isConnectedRef = useRef(false); // Ref to track connection state in callbacks
+    const styleInjectedRef = useRef(false);
+
+    // Inject custom styles once
+    useEffect(() => {
+        if (!styleInjectedRef.current) {
+            const styleElement = document.createElement('style');
+            styleElement.textContent = terminalStyles;
+            document.head.appendChild(styleElement);
+            styleInjectedRef.current = true;
+        }
+    }, []);
 
     // Initialize xterm.js
     useEffect(() => {
@@ -34,34 +63,45 @@ export const SSHTerminal: React.FC<SSHTerminalProps> = ({
         }
 
         const xterm = new XTerm({
+            cols: 80,
+            rows: 24,
             theme: {
-                background: '#1a1b26',
-                foreground: '#c0caf5',
-                cursor: '#c0caf5',
-                cursorAccent: '#1a1b26',
-                selectionBackground: '#33467c',
-                black: '#15161e',
-                red: '#f7768e',
-                green: '#9ece6a',
-                yellow: '#e0af68',
-                blue: '#7aa2f7',
-                magenta: '#bb9af7',
-                cyan: '#7dcfff',
-                white: '#a9b1d6',
-                brightBlack: '#414868',
-                brightRed: '#f7768e',
-                brightGreen: '#9ece6a',
-                brightYellow: '#e0af68',
-                brightBlue: '#7aa2f7',
-                brightMagenta: '#bb9af7',
-                brightCyan: '#7dcfff',
-                brightWhite: '#c0caf5',
+                background: '#0d1117',      // GitHub dark background
+                foreground: '#c9d1d9',      // Light gray text
+                cursor: '#00ff00',          // Neon green cursor
+                cursorAccent: '#000000',
+                selectionBackground: '#264f78',
+                selectionForeground: '#ffffff',
+                black: '#484f58',
+                red: '#ff7b72',
+                green: '#3fb950',
+                yellow: '#d29922',
+                blue: '#58a6ff',
+                magenta: '#bc8cff',
+                cyan: '#39c5cf',
+                white: '#b1bac4',
+                brightBlack: '#6e7681',
+                brightRed: '#ffa198',
+                brightGreen: '#56d364',
+                brightYellow: '#e3b341',
+                brightBlue: '#79c0ff',
+                brightMagenta: '#d2a8ff',
+                brightCyan: '#56d4dd',
+                brightWhite: '#f0f6fc',
             },
-            fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-            fontSize: 13,
+            fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'Monaco', monospace",
+            fontSize: 14,
+            fontWeight: '400',
+            fontWeightBold: '600',
+            letterSpacing: 0,
+            lineHeight: 1.2,
             cursorBlink: true,
-            cursorStyle: 'block',
+            cursorStyle: 'block',           // Block cursor for visibility
+            cursorInactiveStyle: 'block',   // Keep block even when not focused
+            scrollback: 5000,
             allowProposedApi: true,
+            convertEol: true,
+            scrollOnUserInput: true,
         });
 
         const fitAddon = new FitAddon();
@@ -70,6 +110,38 @@ export const SSHTerminal: React.FC<SSHTerminalProps> = ({
         xterm.loadAddon(fitAddon);
         xterm.loadAddon(webLinksAddon);
         xterm.open(terminalRef.current);
+
+        // Focus immediately to show cursor
+        xterm.focus();
+        
+        // Force re-apply theme after open (fixes WebKit rendering issues)
+        setTimeout(() => {
+            xterm.options.theme = {
+                background: '#0d1117',
+                foreground: '#c9d1d9',
+                cursor: '#00ff00',
+                cursorAccent: '#000000',
+                selectionBackground: '#264f78',
+                selectionForeground: '#ffffff',
+                black: '#484f58',
+                red: '#ff7b72',
+                green: '#3fb950',
+                yellow: '#d29922',
+                blue: '#58a6ff',
+                magenta: '#bc8cff',
+                cyan: '#39c5cf',
+                white: '#b1bac4',
+                brightBlack: '#6e7681',
+                brightRed: '#ffa198',
+                brightGreen: '#56d364',
+                brightYellow: '#e3b341',
+                brightBlue: '#79c0ff',
+                brightMagenta: '#d2a8ff',
+                brightCyan: '#56d4dd',
+                brightWhite: '#f0f6fc',
+            };
+            xterm.refresh(0, xterm.rows - 1);
+        }, 50);
 
         // IMPORTANT: Fit must be called after a slight delay to ensure container is rendered
         setTimeout(() => {
@@ -90,12 +162,16 @@ export const SSHTerminal: React.FC<SSHTerminalProps> = ({
 
         // Handle keystrokes - send to PTY
         xterm.onData(async (data) => {
-            if (isConnected) {
+            console.log('PTY: onData fired, connected:', isConnectedRef.current, 'data:', JSON.stringify(data));
+            if (isConnectedRef.current) {
                 try {
                     await invoke('pty_write', { data });
+                    console.log('PTY: write success');
                 } catch (e) {
                     console.error('PTY write error:', e);
                 }
+            } else {
+                console.warn('PTY: Not connected, ignoring keystroke');
             }
         });
 
@@ -172,6 +248,7 @@ export const SSHTerminal: React.FC<SSHTerminalProps> = ({
             const result = await invoke<string>('spawn_shell', { cwd: cwdToUse });
             console.log('PTY: Shell spawned:', result);
             setIsConnected(true);
+            isConnectedRef.current = true; // Update ref for callbacks
 
             if (xtermRef.current) {
                 xtermRef.current.clear();
@@ -188,6 +265,17 @@ export const SSHTerminal: React.FC<SSHTerminalProps> = ({
 
             // Focus terminal
             xtermRef.current?.focus();
+
+            // Send custom PS1 after a short delay to override .bashrc
+            setTimeout(async () => {
+                try {
+                    // Set colorful prompt: green user@host, blue path
+                    const ps1Command = `export PS1='\\[\\e[1;32m\\]\\u@\\h\\[\\e[0m\\]:\\[\\e[1;34m\\]\\w\\[\\e[0m\\]\\$ ' && clear\n`;
+                    await invoke('pty_write', { data: ps1Command });
+                } catch (e) {
+                    console.error('Failed to set PS1:', e);
+                }
+            }, 300);
 
         } catch (e) {
             if (xtermRef.current) {
@@ -212,6 +300,7 @@ export const SSHTerminal: React.FC<SSHTerminalProps> = ({
         }
 
         setIsConnected(false);
+        isConnectedRef.current = false; // Update ref for callbacks
 
         if (xtermRef.current) {
             xtermRef.current.writeln('');
@@ -234,12 +323,12 @@ export const SSHTerminal: React.FC<SSHTerminalProps> = ({
     }, []);
 
     return (
-        <div className={`flex flex-col h-full bg-[#1a1b26] ${className}`}>
-            <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+        <div className={`flex flex-col h-full bg-[#0d1117] ${className}`}>
+            <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d]">
                 <div className="flex items-center gap-2 text-sm text-gray-300">
                     <TerminalIcon size={14} className={isConnected ? 'text-green-400' : 'text-gray-400'} />
-                    <span className="font-medium">Terminal</span>
-                    <span className={`text-xs ${isConnected ? 'text-green-400' : 'text-gray-500'}`}>
+                    <span className="font-medium font-mono">Terminal</span>
+                    <span className={`text-xs font-mono ${isConnected ? 'text-green-400' : 'text-gray-500'}`}>
                         {isConnected ? '● Connected' : '○ Disconnected'}
                     </span>
                 </div>
@@ -276,7 +365,11 @@ export const SSHTerminal: React.FC<SSHTerminalProps> = ({
                     )}
                 </div>
             </div>
-            <div ref={terminalRef} className="flex-1 p-2 overflow-hidden" />
+            <div 
+                ref={terminalRef} 
+                className="flex-1 p-1 overflow-hidden cursor-text bg-[#0d1117]" 
+                onClick={() => xtermRef.current?.focus()}
+            />
         </div>
     );
 };

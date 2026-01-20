@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-01-20
+
+### 🎉 First Stable Release
+
+#### Changed
+- **Logo**: Removed shadow/glow effects for cleaner appearance (animation retained for activity indicator)
+
+#### Fixed
+- **DevTools Terminal**: Fixed keyboard input not working (stale closure bug with connection state)
+- **DevTools Terminal**: Improved terminal styling with GitHub Dark theme
+- **DevTools Terminal**: Added colored PS1 prompt (green user@host, blue path)
+
+#### Technical
+- Updated Tauri plugin versions for compatibility
+- Terminal now uses block cursor with proper focus handling
+
+---
+
 ## [0.9.9] - 2026-01-18
 
 ### Added

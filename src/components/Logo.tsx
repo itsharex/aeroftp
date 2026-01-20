@@ -53,14 +53,10 @@ export const Logo: React.FC<LogoProps> = ({
         return () => observer.disconnect();
     }, []);
 
-    // Glow styles based on connection state
+    // Style based on connection state (shadow removed for cleaner look)
     const getGlowStyle = () => {
-        if (isReconnecting) {
-            return { filter: 'drop-shadow(0 0 8px rgba(234, 179, 8, 0.6))' };
-        }
-        if (isConnected) {
-            return { filter: 'drop-shadow(0 0 6px rgba(34, 211, 238, 0.5))' };
-        }
+        // No shadow effects - keeping logo clean
+        // Activity is indicated via animate-pulse class instead
         return {};
     };
 
